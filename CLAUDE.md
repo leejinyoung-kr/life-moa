@@ -64,38 +64,9 @@ life-moa/
 └── docker-compose.demo.yml # 데모 인스턴스 덮어쓰기 (ADR 0008)
 ```
 
-### 데이터 모델 (ERD 요약)
+### 데이터 모델
 
-| 엔티티 | 주요 필드 | 상태 |
-| --- | --- | --- |
-| User | id, google_id, email, name, picture | 구현 완료 |
-| Transaction | user_id, type, category, amount, date, recurring_schedule_id | 구현 완료 |
-| RecurringSchedule | user_id, kind(transaction/investment), rule(JSON), start_date, active | 구현 완료 |
-| TransactionFavorite | user_id, type(income/expense), title, category, amount, pay_method, sort_order | 구현 완료 |
-| Saving | user_id, type, interest_rate, balance, maturity_date | 구현 완료 |
-| InvestmentAccount | user_id, name, cash_balance, cash_balance_usd, account_number_enc, start_date, maturity_date (투자 계좌 — 예수금) | 구현 완료 |
-| Investment | user_id, account_id, type, principal, current_value, purchase_date | 구현 완료 |
-| Subscription | user_id, name, amount, cycle, status, next_payment_date, billing_day(원래 결제일) | 구현 완료 |
-| NetWorthSnapshot | user_id, month, total_assets, total_debt(부동산/부채 기능 제거 이후 항상 0), cash_total(현금 스냅샷 캐시) | 구현 완료 |
-| UserSettings | user_id, notif_*, session_expiry, pw_auto_hide, master_lock_*, categories(JSON) | 구현 완료 |
-| Notification | user_id, group, tone, title, description, source, read_at | 구현 완료 |
-| CalendarEvent | user_id, date, type(pay/due/exp/task), title, is_lunar/lunar_month/lunar_day/lunar_leap, recur_freq, recur_until, notify(당일 9시 알림) | 구현 완료 |
-| Holiday | date, name, is_substitute, year (전 사용자 공용 캐시, user_id 없음) | 구현 완료 |
-| LoginSession | user_id, device, device_type, location, is_current, revoked_at | 구현 완료 |
-| Category | user_id, domain, code, label, parent_code(2계층), sort_order, is_active | 구현 완료 |
-| Credential | user_id, name, category, username, password_enc, totp_enc, backup_codes_enc, password_changed_at | 구현 완료 |
-| StorageFolder | user_id, parent_id(무한중첩), name | 구현 완료 |
-| StorageFile | user_id, folder_id, object_key(B2), name, size, mime_type, hash(SHA-256) | 구현 완료 |
-| AccessLog | user_id, action, target_type/id/name, ip, user_agent | 구현 완료 |
-| PushSubscription | user_id, session_id(로그인 세션 — 그 세션이 지워지면 구독도 CASCADE), endpoint, p256dh, auth (웹 푸시 구독) | 구현 완료 |
-| RefreshToken | user_id, session_id, jti, expires_at, revoked_at, replaced_by (refresh 토큰 화이트리스트, rotation/로그아웃/세션revoke 시 폐기. 회전 직후 옛 토큰은 15초 허용 · 지나면 세션 끊기 — ADR 0001) | 구현 완료 |
-| EmailLoginCode | email, code_hash(SHA-256), expires_at, consumed_at, attempts (이메일 인증코드 로그인, 화이트리스트 대조) | 구현 완료 |
-| SystemLog | user_id(nullable, FK 아님), level(info/warn/error), category, message, metadata(JSON) — 크론·투자갱신 등 백그라운드 작업 로그, 90일 경과 시 자동 삭제 | 구현 완료 |
-| JobRun | job, triggered_by(schedule/manual), status(running/succeeded/failed), started_at, lease_until, finished_at, summary, error, running_key(유니크 — 동시 실행 방지) — 예약 작업 실행 기록(core-jobs), 90일 경과 시 자동 삭제 | 구현 완료 |
-| OutboxMessage | channel, payload(JSON), idempotency_key(유니크 — `noti:<알림 id>`), status(pending/sending/sent/failed), attempts, max_attempts, available_at, claimed_until, last_error, sent_at — 알림 발송 아웃박스(core-notification). 알림 행과 **같은 트랜잭션**에 적재되므로 롤백되면 발송도 없다. 끝난 행(sent/failed)은 90일 경과 시 자동 삭제 | 구현 완료 |
-
-> DB: MariaDB, 문자셋: utf8mb4_unicode_ci · 총 25개 테이블
-> 상세 스키마: [docs/erd.md](docs/erd.md)
+MariaDB(utf8mb4_unicode_ci) 25개 테이블. 엔티티 · 필드 · 관계 · 규칙은 [docs/erd.md](docs/erd.md) 를 본다.
 
 ---
 
@@ -118,31 +89,7 @@ life-moa/
 
 ## 현재 상태
 
-| 영역 | 상태 |
-| --- | --- |
-| Frontend — 로그인 | 구현 완료 |
-| Frontend — 대시보드 | 구현 완료 |
-| Frontend — 가계부 (수입/지출/예적금/투자) | 구현 완료 |
-| Frontend — 순자산 | 구현 완료 |
-| Frontend — 구독 관리 | 구현 완료 |
-| Frontend — 캘린더 | 구현 완료 |
-| Frontend — 알림 | 구현 완료 |
-| Frontend — 보안 (로그인 기기·보안 설정·최근 열람) | 구현 완료 |
-| Frontend — 설정 (프로필·데이터) | 구현 완료 |
-| Frontend — 자격증명 | 구현 완료 (백엔드 연동) |
-| Frontend — 파일 보관함 | 구현 완료 (B2 연동) |
-| Frontend — 시스템 로그 | 구현 완료 (백엔드 연동) |
-| Frontend — React Query 전환 | 전 페이지·공통 컴포넌트 완료 |
-| Backend — Google OAuth + JWT (전역 가드 + Rate-limit) | 구현 완료 |
-| Backend — 가계부/구독/자산/캘린더 | 구현 완료 |
-| Backend — 알림/보안/설정/통합검색/대시보드 | 구현 완료 |
-| Backend — 계정 보관함 (AES 암호화) | 구현 완료 |
-| Backend — 마스터 잠금·접근로그·세션 | 구현 완료 |
-| Backend — 파일 보관함 (Backblaze B2) | 구현 완료 |
-| Backend — 데이터 내보내기/가져오기 (JSON·ZIP·복원) | 구현 완료 |
-| Backend — 현금흐름 예측·통합 D-day | 구현 완료 |
-| Backend — 시스템 로그 / 순자산 월간 스냅샷 / 투자 현재가 자동 갱신 | 구현 완료 |
-| DB | 25개 테이블 구현 완료 |
+위 기능은 모두 구현돼 운영 중이다(홈서버 · 데모). 화면별 데이터 · 동작은 [docs/planning.md](docs/planning.md), 모듈 구조는 [docs/architecture.md](docs/architecture.md).
 
 ---
 
@@ -155,16 +102,12 @@ pnpm run dev                           # frontend + backend 동시 실행
 pnpm run dev:backend                   # backend만 실행
 pnpm run dev:frontend                  # frontend만 실행
 
-# DB 마이그레이션 (스키마 변경 시) — 파일만 먼저 만들고, migration.sql 에 컬럼 · 테이블 COMMENT 를 손으로 넣은 뒤 적용한다
-# (Prisma 의 /// 주석은 MySQL COMMENT 로 나가지 않는다. 이 순서면 migrate reset 이 필요 없다)
-cd backend && npx prisma migrate dev --create-only --name add_xxx
-cd backend && npx prisma migrate dev
+# DB 마이그레이션 (스키마 변경 시) — 파일만 먼저 만들고 COMMENT 를 넣은 뒤 적용 (루트 CLAUDE.md 「DB 컬럼 코멘트」)
+pnpm --filter backend exec prisma migrate dev --create-only --name add_xxx
+pnpm --filter backend exec prisma migrate dev
 
-# Prisma Studio (GUI로 데이터 확인)
-cd backend && npx prisma studio        # localhost:5555
-
-# Prisma 타입 재생성
-cd backend && npx prisma generate
+pnpm --filter backend exec prisma studio       # Prisma Studio — localhost:5555
+pnpm --filter backend exec prisma generate     # Prisma 타입 재생성
 ```
 
 ### 운영 배포 (홈서버)
@@ -247,3 +190,7 @@ docker compose exec backend npx prisma migrate deploy
 - [docs/category-migration.md](docs/category-migration.md) — 카테고리 2계층 구조 + 엑셀→앱 매칭표(실데이터 마이그레이션용)
 - [docs/archive/](docs/archive/) — 끝난 작업의 설계·계획 문서
 - [docs/implementation-notes.md](docs/implementation-notes.md) — 설명할 거리가 있는 개선 (문제 · 원인 · 고친 방법 · 일부러 안 고친 곳)
+- [docs/core-libraries.md](docs/core-libraries.md) — 쓰는 코어 패키지(young-core, 비공개) 설계 요약
+- [docs/index-design.md](docs/index-design.md) — 인덱스별로 그것을 쓰는 쿼리 (AI 초안)
+- [docs/test-audit.md](docs/test-audit.md) — 테스트가 실제로 무엇을 증명하는지 분류 (AI 초안)
+- [docs/design/](docs/design/) — 디자인 시안 · 점검 (옛 이름 life-ledger 시절 파일)
