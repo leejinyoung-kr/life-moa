@@ -2,6 +2,7 @@
 
 > 2026-10-13 · 대상: 이 폴더의 `life-ledger-main.html` · `life-ledger-components.html` · `life-ledger-modals.html`(추가분, §9) · `source/` (Claude 디자인 결과물)
 > 기준: `docs/planning.md` §2 ~ §7, Claude 디자인에 넘긴 프롬프트, 지금 develop 코드
+> 줄 번호(`파일:줄`)는 점검 당시 코드(`38993ea`) 기준이다 — 그 뒤 코드가 바뀌어 지금 줄과는 다르다 (2026-11-23)
 > **판정: §6 D1 ~ D9 · §9.5 D10 모두 권고대로 확정 (2026-10-13).** 이 문서가 4단계 구현의 기준이다 — 시안과 이 문서가 다르면 이 문서를 따른다.
 > 방법:
 >

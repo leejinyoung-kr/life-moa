@@ -120,16 +120,16 @@
 | 암호문 컬럼 쓰기 가드 — 평문이 `_enc` 컬럼에 저장되지 않는지 | `prisma/prisma.service.ts` (core-security `encryptedFields`) | 없음 (`crypto-fields.spec` 은 목록 대조만) | 가드가 빠지면 평문 비번이 DB 에 그대로 남는다 |
 | 데이터 내보내기 — 계정 JSON 의 이메일 문맥 암호화 · 전체 ZIP | `export/export.service.ts` | 없음 (복원 쪽 `import` 만 있음) | 내보내기 → 가져오기 왕복이 깨지면 백업이 쓸모없어진다 |
 | 순자산 월말 스냅샷 + 현금 델타 | `maintenance/net-worth-snapshot-cron.service.ts`, `asset/asset.service.ts:74` | 크론 테스트 없음 · 델타 경로 미검증 (가짜 후보 ③) | 대시보드 첫 숫자. 이중 계산 버그가 실제로 있었던 곳 |
-| 가계부 목록 · 월 요약 · 월별 추이 합계 | `transaction/transaction.service.ts:314`~`:416` | 없음 (자산이동 잔액만 있음) | 화면의 수입 · 지출 · 잔액 숫자 |
-| 반복거래 회차 생성 (멱등 · 시작일 이전 회차 제외 · 자산이동 일괄 반영) | `transaction/transaction.service.ts:186`~`:267` | 없음 (순수 함수 `recurring.util` 만) | 매일 크론이 돈다 — 두 번 생성되면 돈이 두 번 빠진다. 반복매수 쪽(`investment`)은 테스트가 있다 |
-| 가계부 엑셀 가져오기 · 내보내기 | `transaction/transaction.service.ts:449`, `:563` | 없음 (계정 엑셀만 있음) | 대량 입력 경로 |
+| 가계부 목록 · 월 요약 · 월별 추이 합계 | `transaction/transaction.service.ts:314`~`:426` | 없음 (자산이동 잔액만 있음) | 화면의 수입 · 지출 · 잔액 숫자 |
+| 반복거래 회차 생성 (멱등 · 시작일 이전 회차 제외 · 자산이동 일괄 반영) | `transaction/transaction.service.ts:186`~`:281` | 없음 (순수 함수 `recurring.util` 만) | 매일 크론이 돈다 — 두 번 생성되면 돈이 두 번 빠진다. 반복매수 쪽(`investment`)은 테스트가 있다 |
+| 가계부 엑셀 가져오기 · 내보내기 | `transaction/transaction.service.ts:465`, `:575` | 없음 (계정 엑셀만 있음) | 대량 입력 경로 |
 | 알림 크론 — 만기 · 결제 D-day 정확히 그날만, 같은 제목 미읽음이면 건너뜀 | `maintenance/notification-cron.service.ts` | 없음 | 매일 반복 알림 · 누락 |
 | 알림 + 푸시 한 트랜잭션 (`createWithPush`) | `notification/notification.service.ts` | 없음 (아웃박스 저장소만) | 롤백 시 푸시가 나가지 않아야 한다 |
 | 세션 강제 로그아웃 — refresh 폐기 + 그 기기 푸시 삭제 | `security/security.service.ts:36`~`:89` | 없음 (로그아웃 쪽은 있음) | 2026-10-15 수정("로그아웃한 기기로 알림이 가지 않게") 지점 |
 | 캘린더 반복 · 음력 일정 펼치기 | `calendar/calendar.service.ts` | 없음 | 음력 변환 · 윤달 · 반복 종료일 경계 |
 | 휴지통 영구삭제 크론 | `maintenance/trash-cron.service.ts` | 없음 | 매일 데이터를 지운다 (구독 결제일 넘기기 크론은 2026-10-22 가계부 자동 등록을 넣으면서 `subscription-cron.service.spec.ts` 를 만들었다) |
 | 대시보드 현금흐름 예측 · 통합 D-day | `dashboard/dashboard.service.ts` | 없음 | 주기 환산(주 52/12 · 평일 261/12) |
-| frontend API 클라이언트 — 401 이면 refresh 한 번 · 동시 401 공유 | `frontend/lib/api.ts:34`~`:50` | 없음 (vitest 는 `lib` 순수 함수만) | 토큰 만료 때 무한 재시도 · 중복 refresh |
+| frontend API 클라이언트 — 401 이면 refresh 한 번 · 동시 401 공유 | `frontend/lib/api.ts:34`~`:70` · `:105` | 없음 (vitest 는 `lib` 순수 함수만) | 토큰 만료 때 무한 재시도 · 중복 refresh |
 | DB 에 의존하는 규칙 전체 — UNIQUE(`running_key` · `idempotency_key` · `holiday(date,name)` · `net_worth_snapshot(user_id,month)`) | — | 통합 테스트 0개, P2002 는 mock | 이 규칙들은 코드가 아니라 DB 제약이 지킨다 |
 
 ## 4. 같이 본 CI 단계 결과 (로컬, 2026-10-18)
