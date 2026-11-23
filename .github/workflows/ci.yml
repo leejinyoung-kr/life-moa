@@ -12,6 +12,7 @@ on:
       - 'package.json'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
+      - 'scripts/check-doc-refs.mjs'
       - '.github/workflows/ci.yml'
   pull_request:
     paths:
@@ -20,6 +21,7 @@ on:
       - 'package.json'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
+      - 'scripts/check-doc-refs.mjs'
       - '.github/workflows/ci.yml'
   workflow_dispatch:
 
@@ -107,3 +109,21 @@ jobs:
       - run: pnpm build
 
       - run: pnpm test
+
+  # 문서(docs/)의 `파일:줄` 참조가 코드 변경으로 밀렸거나 빈 줄을 가리키면 경고(annotation)만 남긴다.
+  # 문서 때문에 배포가 막히지 않게 실패해도 통과로 둔다
+  doc-refs:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      # 기준 커밋과 diff 를 떠야 해서 전체 기록을 받는다
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # 기준: PR 은 base, push 는 직전 커밋. 새 브랜치 push(before 가 0) · 수동 실행은 기준 없이 지금 파일만 본다
+      # 잡 단위 continue-on-error 가 workflow_call(배포) 쪽 결과에도 통하는지 확실하지 않아 step 에도 건다
+      - run: node scripts/check-doc-refs.mjs $BASE
+        continue-on-error: true
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || (github.event.before != '0000000000000000000000000000000000000000' && github.event.before || '') }}

@@ -60,6 +60,7 @@ life-moa/
 ├── nginx/             # 앞단 Nginx 설정 default.conf (홈서버 · 데모, ADR 0010)
 ├── tailscale/         # 사이드카 serve.json (전부 nginx:80 으로)
 ├── docs/              # 설계 문서 · adr/ · runbooks/ · postmortems/
+├── scripts/           # check-doc-refs.mjs — 문서 `파일:줄` 참조 검사 (CI doc-refs 잡)
 ├── docker-compose.yml
 └── docker-compose.demo.yml # 데모 인스턴스 덮어쓰기 (ADR 0008)
 ```
@@ -174,6 +175,8 @@ docker compose exec backend npx prisma migrate deploy
 - **운영 상태 확인**: `GET /api/v1/_meta`(로그인 필요) 가 빌드 커밋·설치된 `@leejinyoung-kr/core-*` 버전과 함께 예약 작업(마지막 성공·다음 실행)·아웃박스 적체·켜진 알림 채널을 한 번에 보여준다. **`warn` 배열만 먼저 보면 된다** — 비어 있으면 볼 게 없다는 뜻. 구역을 추가하려면 `meta/` 에 `MetaContributor` 를 만들어 `app.module.ts` 의 `MetaModule.forRoot({ contributors })` 에 넣는다(코어는 테이블을 모른다).
 
 - **알림 + 푸시**: 알림을 만들면서 푸시를 보내려면 `NotificationService.createWithPush()` 를 쓴다 — 알림 행 저장과 푸시 적재(`outbox_message`)가 한 트랜잭션이라, 저장이 롤백되면 푸시도 나가지 않는다. 푸시를 직접 보내지 않는다(발송·재시도·실패 기록은 아웃박스가 맡는다. 멱등키는 `noti:<알림 id>`). 즉시 결과를 봐야 하는 것(설정 화면의 테스트 푸시, 로그인 인증코드 메일)만 예외로 바로 보낸다.
+
+- **문서의 `파일:줄` 참조** (`docs/index-design.md` · `docs/test-audit.md` 등): 코드를 고친 뒤 커밋 전에 `node scripts/check-doc-refs.mjs HEAD` 로 밀린 참조를 보고 같이 고친다(2026-11-23). CI `doc-refs` 잡도 같은 검사를 돌려 경고만 남긴다 — 실패시키지 않아 배포는 막지 않는다. `docs/archive/` · `docs/design/` 은 당시 코드 기준 기록이라 검사하지 않는다.
 
 
 ---
