@@ -7,13 +7,19 @@ import { SystemLogService } from '../system-log/system-log.service';
 describe('AssetService', () => {
   let txs: { type: 'income' | 'expense' | 'transfer'; amount: number }[];
   let savings: number[];
-  let snaps: { month: string; total_assets: number; cash_total: number | null }[];
+  let snaps: {
+    month: string;
+    total_assets: number;
+    cash_total: number | null;
+  }[];
   let prisma: any;
   const dec = (n: number) => new Prisma.Decimal(n);
   const svc = () =>
     new AssetService(
       prisma,
-      { getExchangeRate: jest.fn(async () => 1300) } as unknown as PriceLookupService,
+      {
+        getExchangeRate: jest.fn(async () => 1300),
+      } as unknown as PriceLookupService,
       { warn: jest.fn() } as unknown as SystemLogService,
     );
 
@@ -26,11 +32,21 @@ describe('AssetService', () => {
         groupBy: jest.fn(async () =>
           (['income', 'expense', 'transfer'] as const).map((type) => ({
             type,
-            _sum: { amount: dec(txs.filter((t) => t.type === type).reduce((s, t) => s + t.amount, 0)) },
+            _sum: {
+              amount: dec(
+                txs
+                  .filter((t) => t.type === type)
+                  .reduce((s, t) => s + t.amount, 0),
+              ),
+            },
           })),
         ),
       },
-      saving: { findMany: jest.fn(async () => savings.map((b) => ({ balance: dec(b), interest_rate: dec(3) }))) },
+      saving: {
+        findMany: jest.fn(async () =>
+          savings.map((b) => ({ balance: dec(b), interest_rate: dec(3) })),
+        ),
+      },
       investment: { findMany: jest.fn(async () => []) },
       investmentAccount: { findMany: jest.fn(async () => []) },
       netWorthSnapshot: {
@@ -42,10 +58,19 @@ describe('AssetService', () => {
   });
 
   const toRow = (s?: (typeof snaps)[number]) =>
-    s && { month: s.month, total_assets: dec(s.total_assets), total_debt: dec(0), cash_total: s.cash_total == null ? null : dec(s.cash_total) };
+    s && {
+      month: s.month,
+      total_assets: dec(s.total_assets),
+      total_debt: dec(0),
+      cash_total: s.cash_total == null ? null : dec(s.cash_total),
+    };
 
   it('예적금으로 옮긴 돈은 현금에서 빠진다(이중 계산하지 않는다)', async () => {
-    txs.push({ type: 'income', amount: 3_000_000 }, { type: 'expense', amount: 1_000_000 }, { type: 'transfer', amount: 500_000 });
+    txs.push(
+      { type: 'income', amount: 3_000_000 },
+      { type: 'expense', amount: 1_000_000 },
+      { type: 'transfer', amount: 500_000 },
+    );
     savings.push(500_000); // 자산이동 연동으로 예적금 잔액에 더해진 돈
     const res = await svc().summary(1);
     expect(res.byType.find((b) => b.type === 'cash')?.amount).toBe(1_500_000);
@@ -71,7 +96,11 @@ describe('AssetService', () => {
     snaps.push({ month: '2000-01', total_assets: 1_000_000, cash_total: null });
     const res = await svc().trend(1);
     expect(res).toHaveLength(2);
-    expect(res[0]).toMatchObject({ month: '2000-01', netWorth: 1_000_000, current: false });
+    expect(res[0]).toMatchObject({
+      month: '2000-01',
+      netWorth: 1_000_000,
+      current: false,
+    });
     expect(res[1]).toMatchObject({ netWorth: 2_000_000, current: true });
   });
 });

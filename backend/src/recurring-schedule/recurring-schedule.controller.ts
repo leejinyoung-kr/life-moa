@@ -30,13 +30,19 @@ export class RecurringScheduleController {
 
   // 자동이체 설정 목록 (kind 필터)
   @Get()
-  findAll(@CurrentUser() user: AuthUser, @Query() query: QueryRecurringScheduleDto) {
+  findAll(
+    @CurrentUser() user: AuthUser,
+    @Query() query: QueryRecurringScheduleDto,
+  ) {
     return this.service.findAll(user.id, query);
   }
 
   // 자동이체 설정 추가
   @Post()
-  create(@CurrentUser() user: AuthUser, @Body() dto: CreateRecurringScheduleDto) {
+  create(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: CreateRecurringScheduleDto,
+  ) {
     return this.service.create(user.id, dto);
   }
 

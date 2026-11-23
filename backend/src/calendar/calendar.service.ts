@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma, CalendarEvent, CalRecurFreq } from '@prisma/client';
 import KoreanLunarCalendar from 'korean-lunar-calendar';
 import { PrismaService } from '../prisma/prisma.service';
@@ -60,7 +64,14 @@ function solarToLunar(
   date: Date,
 ): { month: number; day: number; intercalation: boolean } | null {
   const cal = new KoreanLunarCalendar();
-  if (!cal.setSolarDate(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate())) return null;
+  if (
+    !cal.setSolarDate(
+      date.getUTCFullYear(),
+      date.getUTCMonth() + 1,
+      date.getUTCDate(),
+    )
+  )
+    return null;
   const l = cal.getLunarCalendar();
   return { month: l.month, day: l.day, intercalation: !!l.intercalation };
 }
@@ -76,7 +87,11 @@ function lunarYearlyOccurrencesInRange(
 ): Date[] {
   const dates: Date[] = [];
   // 연말/연초 드리프트 대비 앞뒤 1년씩 여유를 두고 순회
-  for (let y = range.gte.getUTCFullYear() - 1; y <= range.lt.getUTCFullYear() + 1; y++) {
+  for (
+    let y = range.gte.getUTCFullYear() - 1;
+    y <= range.lt.getUTCFullYear() + 1;
+    y++
+  ) {
     const occ = lunarToSolar(y, lunarMonth, lunarDay, leap);
     if (!occ || occ < base || (until && occ > until)) continue;
     if (occ >= range.gte && occ < range.lt) dates.push(occ);
@@ -93,7 +108,11 @@ function lunarYearlyNextOccurrenceOnOrAfter(
   until: Date | null,
   from: Date,
 ): Date | null {
-  for (let y = from.getUTCFullYear() - 1; y <= from.getUTCFullYear() + 50; y++) {
+  for (
+    let y = from.getUTCFullYear() - 1;
+    y <= from.getUTCFullYear() + 50;
+    y++
+  ) {
     const occ = lunarToSolar(y, lunarMonth, lunarDay, leap);
     if (!occ || occ < base) continue;
     if (until && occ > until) return null;
@@ -110,7 +129,12 @@ function occurrencesInRange(
   const { date: base, recur_freq: freq, recur_until: until } = event;
   if (freq === 'none')
     return base >= range.gte && base < range.lt ? [base] : [];
-  if (event.is_lunar && freq === 'yearly' && event.lunar_month && event.lunar_day) {
+  if (
+    event.is_lunar &&
+    freq === 'yearly' &&
+    event.lunar_month &&
+    event.lunar_day
+  ) {
     return lunarYearlyOccurrencesInRange(
       event.lunar_month,
       event.lunar_day,
@@ -130,10 +154,18 @@ function occurrencesInRange(
 }
 
 // 반복 일정의 from(포함) 이후 가장 가까운 발생일 (없으면 null)
-function nextOccurrenceOnOrAfter(event: CalendarEvent, from: Date): Date | null {
+function nextOccurrenceOnOrAfter(
+  event: CalendarEvent,
+  from: Date,
+): Date | null {
   const { date: base, recur_freq: freq, recur_until: until } = event;
   if (freq === 'none') return base >= from ? base : null;
-  if (event.is_lunar && freq === 'yearly' && event.lunar_month && event.lunar_day) {
+  if (
+    event.is_lunar &&
+    freq === 'yearly' &&
+    event.lunar_month &&
+    event.lunar_day
+  ) {
     return lunarYearlyNextOccurrenceOnOrAfter(
       event.lunar_month,
       event.lunar_day,
@@ -165,7 +197,10 @@ function decodeVirtId(
   id: number,
 ): { sourceType: VirtSource; sourceId: number } | null {
   if (id >= VIRT_OFFSET.investmentAccount)
-    return { sourceType: 'investmentAccount', sourceId: id - VIRT_OFFSET.investmentAccount };
+    return {
+      sourceType: 'investmentAccount',
+      sourceId: id - VIRT_OFFSET.investmentAccount,
+    };
   if (id >= VIRT_OFFSET.holiday)
     return { sourceType: 'holiday', sourceId: id - VIRT_OFFSET.holiday };
   if (id >= VIRT_OFFSET.saving)
@@ -214,7 +249,9 @@ export class CalendarService {
   }
 
   // 공휴일을 캘린더 가상 이벤트 DTO로 변환 (삭제 불가 — id는 응답 내에서만 유일하면 됨)
-  private toHolidayDtos(holidays: { date: Date; name: string; isSubstitute: boolean }[]): CalEventDto[] {
+  private toHolidayDtos(
+    holidays: { date: Date; name: string; isSubstitute: boolean }[],
+  ): CalEventDto[] {
     return holidays.map((h, idx) => ({
       id: VIRT_OFFSET.holiday + idx,
       date: toDateStr(h.date),
@@ -258,7 +295,13 @@ export class CalendarService {
           deleted_at: null,
           ...(dateFilter ? { next_payment_date: dateFilter } : {}),
         },
-        select: { id: true, name: true, amount: true, currency: true, next_payment_date: true },
+        select: {
+          id: true,
+          name: true,
+          amount: true,
+          currency: true,
+          next_payment_date: true,
+        },
       }),
       this.prisma.saving.findMany({
         where: {
@@ -376,7 +419,13 @@ export class CalendarService {
   async upcoming(userId: number, limit = 5) {
     const today = todayKst();
 
-    const oneYearLater = new Date(Date.UTC(today.getUTCFullYear() + 1, today.getUTCMonth(), today.getUTCDate()));
+    const oneYearLater = new Date(
+      Date.UTC(
+        today.getUTCFullYear() + 1,
+        today.getUTCMonth(),
+        today.getUTCDate(),
+      ),
+    );
 
     const [rows, virtual, holidays] = await Promise.all([
       this.prisma.calendarEvent.findMany({
@@ -412,7 +461,11 @@ export class CalendarService {
       })
       .filter((d): d is CalEventDto => d !== null);
 
-    return [...upcomingRows.map(addDays), ...virtual.map(addDays), ...holidays.map(addDays)]
+    return [
+      ...upcomingRows.map(addDays),
+      ...virtual.map(addDays),
+      ...holidays.map(addDays),
+    ]
       .sort((a, b) => a.date.localeCompare(b.date) || a.id - b.id)
       .slice(0, limit);
   }
@@ -422,20 +475,44 @@ export class CalendarService {
   private resolveEventDate(
     date: string,
     isLunar: boolean,
-  ): { date: Date; lunarMonth: number | null; lunarDay: number | null; lunarLeap: boolean } {
+  ): {
+    date: Date;
+    lunarMonth: number | null;
+    lunarDay: number | null;
+    lunarLeap: boolean;
+  } {
     const solar = new Date(date);
-    if (!isLunar) return { date: solar, lunarMonth: null, lunarDay: null, lunarLeap: false };
+    if (!isLunar)
+      return {
+        date: solar,
+        lunarMonth: null,
+        lunarDay: null,
+        lunarLeap: false,
+      };
     const lunar = solarToLunar(solar);
     if (!lunar) {
-      throw new BadRequestException('지원하지 않는 날짜입니다 (음력 변환 가능 범위: 1000~2050년).');
+      throw new BadRequestException(
+        '지원하지 않는 날짜입니다 (음력 변환 가능 범위: 1000~2050년).',
+      );
     }
-    return { date: solar, lunarMonth: lunar.month, lunarDay: lunar.day, lunarLeap: lunar.intercalation };
+    return {
+      date: solar,
+      lunarMonth: lunar.month,
+      lunarDay: lunar.day,
+      lunarLeap: lunar.intercalation,
+    };
   }
 
   // 추가 DTO → 저장할 행 (음력이면 음력 월/일을 계산해 넣는다)
-  private toCreateData(userId: number, dto: CreateEventDto): Prisma.CalendarEventUncheckedCreateInput {
+  private toCreateData(
+    userId: number,
+    dto: CreateEventDto,
+  ): Prisma.CalendarEventUncheckedCreateInput {
     const isLunar = dto.isLunar ?? false;
-    const { date, lunarMonth, lunarDay, lunarLeap } = this.resolveEventDate(dto.date, isLunar);
+    const { date, lunarMonth, lunarDay, lunarLeap } = this.resolveEventDate(
+      dto.date,
+      isLunar,
+    );
     return {
       user_id: userId,
       date,
@@ -454,7 +531,9 @@ export class CalendarService {
 
   // 일정 추가 (수동 등록만)
   async create(userId: number, dto: CreateEventDto) {
-    const created = await this.prisma.calendarEvent.create({ data: this.toCreateData(userId, dto) });
+    const created = await this.prisma.calendarEvent.create({
+      data: this.toCreateData(userId, dto),
+    });
     return this.toDto(created);
   }
 
@@ -468,8 +547,14 @@ export class CalendarService {
   }
 
   // day 에 회차가 있고 알림을 켠 일정 — 매일 오전 9시 알림 작업이 쓴다 (반복 · 음력 회차 포함)
-  async notifyTargetsOn(userId: number, day: Date): Promise<{ id: number; type: string; title: string }[]> {
-    const range = { gte: day, lt: new Date(day.getTime() + 24 * 60 * 60 * 1000) };
+  async notifyTargetsOn(
+    userId: number,
+    day: Date,
+  ): Promise<{ id: number; type: string; title: string }[]> {
+    const range = {
+      gte: day,
+      lt: new Date(day.getTime() + 24 * 60 * 60 * 1000),
+    };
     const rows = await this.prisma.calendarEvent.findMany({
       where: {
         user_id: userId,

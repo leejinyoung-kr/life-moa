@@ -44,7 +44,10 @@ describe('PrismaJobRunStore', () => {
 
   it('running_key 유니크 충돌(P2002)이면 이미 실행 중 → null', async () => {
     prisma.jobRun.create.mockRejectedValue(
-      new Prisma.PrismaClientKnownRequestError('Unique constraint failed', { code: 'P2002', clientVersion: 'test' }),
+      new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: 'test',
+      }),
     );
     expect(await store.start(start)).toBeNull();
   });
@@ -82,23 +85,43 @@ describe('PrismaJobRunStore', () => {
 
   it('이미 마감된 행(lease 만료)이면 false — 덮어쓰지도, 시스템 로그를 남기지도 않는다', async () => {
     prisma.jobRun.updateMany.mockResolvedValue({ count: 0 });
-    const ok = await store.finish(7, { job: 'db-backup', status: 'failed', finishedAt: new Date(), error: 'late' });
+    const ok = await store.finish(7, {
+      job: 'db-backup',
+      status: 'failed',
+      finishedAt: new Date(),
+      error: 'late',
+    });
     expect(ok).toBe(false);
     expect(sysLog.error).not.toHaveBeenCalled();
   });
 
   it('성공 마감은 시스템 로그를 남기지 않는다', async () => {
-    await store.finish(7, { job: 'db-backup', status: 'succeeded', finishedAt: new Date(), summary: 'ok' });
+    await store.finish(7, {
+      job: 'db-backup',
+      status: 'succeeded',
+      finishedAt: new Date(),
+      summary: 'ok',
+    });
     expect(sysLog.error).not.toHaveBeenCalled();
   });
 
   it('lease 가 지난 running 행을 찾는다', async () => {
     const now = new Date();
     prisma.jobRun.findMany.mockResolvedValue([
-      { id: 3, job: 'trash-purge', started_at: start.startedAt, lease_until: start.leaseUntil },
+      {
+        id: 3,
+        job: 'trash-purge',
+        started_at: start.startedAt,
+        lease_until: start.leaseUntil,
+      },
     ]);
     expect(await store.findExpired(now)).toEqual([
-      { id: 3, job: 'trash-purge', startedAt: start.startedAt, leaseUntil: start.leaseUntil },
+      {
+        id: 3,
+        job: 'trash-purge',
+        startedAt: start.startedAt,
+        leaseUntil: start.leaseUntil,
+      },
     ]);
     expect(prisma.jobRun.findMany).toHaveBeenCalledWith({
       where: { status: 'running', lease_until: { lt: now } },

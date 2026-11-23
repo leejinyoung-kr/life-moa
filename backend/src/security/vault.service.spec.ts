@@ -29,7 +29,9 @@ describe('VaultService (마스터 잠금)', () => {
   });
 
   it('setup: 8자 미만 비번 거부', async () => {
-    await expect(svc().setup(1, '1234567', 5)).rejects.toThrow(BadRequestException);
+    await expect(svc().setup(1, '1234567', 5)).rejects.toThrow(
+      BadRequestException,
+    );
   });
 
   it('setup 후 saltHex:hashHex 형태로 해시 저장 + 활성화', async () => {
@@ -45,7 +47,10 @@ describe('VaultService (마스터 잠금)', () => {
     expect(res.token).toBe('signed-token');
     expect(res.expiresIn).toBe(600); // 10분 = 600초
     // access 와 구분되는 type — Bearer 로 넣어도 JwtStrategy 가 거부하게
-    expect(jwt.sign).toHaveBeenCalledWith({ sub: 1, type: 'vault' }, { expiresIn: 600 });
+    expect(jwt.sign).toHaveBeenCalledWith(
+      { sub: 1, type: 'vault' },
+      { expiresIn: 600 },
+    );
   });
 
   it('unlock: 틀린 비번 거부', async () => {

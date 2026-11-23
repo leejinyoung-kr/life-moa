@@ -27,7 +27,10 @@ export class SearchService {
         take: 5,
       }),
       this.prisma.credential.findMany({
-        where: { ...base, OR: [{ name: like }, { username: like }, { url: like }] },
+        where: {
+          ...base,
+          OR: [{ name: like }, { username: like }, { url: like }],
+        },
         orderBy: { updated_at: 'desc' },
         take: 5,
       }),
@@ -37,13 +40,28 @@ export class SearchService {
     return [
       ...txs.map((t): SearchResult => {
         const date = t.date.toISOString().slice(0, 10);
-        const qs = new URLSearchParams({ q: t.title, date, focus: String(t.id) });
-        return { type: 'tx', icon: '💰', title: t.title, sub: `${date} · 가계부`, href: `/transactions?${qs.toString()}` };
+        const qs = new URLSearchParams({
+          q: t.title,
+          date,
+          focus: String(t.id),
+        });
+        return {
+          type: 'tx',
+          icon: '💰',
+          title: t.title,
+          sub: `${date} · 가계부`,
+          href: `/transactions?${qs.toString()}`,
+        };
       }),
-      ...creds.map((c): SearchResult => ({
-        type: 'cred', icon: '🔑', title: c.name,
-        sub: `${c.username} · 계정`, href: `/credentials?focus=${c.id}`,
-      })),
+      ...creds.map(
+        (c): SearchResult => ({
+          type: 'cred',
+          icon: '🔑',
+          title: c.name,
+          sub: `${c.username} · 계정`,
+          href: `/credentials?focus=${c.id}`,
+        }),
+      ),
     ];
   }
 }

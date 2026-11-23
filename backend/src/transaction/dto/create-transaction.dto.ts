@@ -1,7 +1,4 @@
-import {
-  TransactionType,
-  TransferTarget,
-} from '@prisma/client';
+import { TransactionType, TransferTarget } from '@prisma/client';
 import {
   IsDateString,
   IsEnum,

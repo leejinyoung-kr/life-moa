@@ -35,13 +35,19 @@ export class InvestmentAccountController {
 
   // 계좌 목록 (계좌명 검색 + 페이지네이션)
   @Get()
-  findAll(@CurrentUser() user: AuthUser, @Query() query: QueryInvestmentAccountDto) {
+  findAll(
+    @CurrentUser() user: AuthUser,
+    @Query() query: QueryInvestmentAccountDto,
+  ) {
     return this.service.findAll(user.id, query);
   }
 
   // 계좌 추가
   @Post()
-  create(@CurrentUser() user: AuthUser, @Body() dto: CreateInvestmentAccountDto) {
+  create(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: CreateInvestmentAccountDto,
+  ) {
     return this.service.create(user.id, dto);
   }
 

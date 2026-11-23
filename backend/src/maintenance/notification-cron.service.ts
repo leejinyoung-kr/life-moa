@@ -7,7 +7,12 @@ import { NotificationService } from '../notification/notification.service';
 import { CalendarService } from '../calendar/calendar.service';
 
 // 캘린더 일정 유형 → 알림 설명에 쓰는 이름 (화면의 EV_TYPE_OPTIONS 와 같은 말)
-const CAL_TYPE_LABEL: Record<string, string> = { pay: '구독 결제', due: '입금 · 만기', exp: '서류 만료', task: '할일' };
+const CAL_TYPE_LABEL: Record<string, string> = {
+  pay: '구독 결제',
+  due: '입금 · 만기',
+  exp: '서류 만료',
+  task: '할일',
+};
 
 // 오늘(KST 날짜의 UTC 자정) + days 후 Date
 function addDays(base: Date, days: number): Date {
@@ -37,11 +42,22 @@ export class NotificationCronService {
   // sameDescription: 설명까지 같아야 중복 — 캘린더 반복 일정은 제목이 매번 같아, 지난 회차를 안 읽었어도 새 회차는 보낸다
   private async emit(
     userId: number,
-    n: { group: NotiGroup; tone: NotiTone; title: string; description: string; source: string },
+    n: {
+      group: NotiGroup;
+      tone: NotiTone;
+      title: string;
+      description: string;
+      source: string;
+    },
     opts: { sameDescription?: boolean; url?: string } = {},
   ): Promise<number> {
     const dup = await this.prisma.notification.findFirst({
-      where: { user_id: userId, title: n.title, read_at: null, ...(opts.sameDescription ? { description: n.description } : {}) },
+      where: {
+        user_id: userId,
+        title: n.title,
+        read_at: null,
+        ...(opts.sameDescription ? { description: n.description } : {}),
+      },
       select: { id: true },
     });
     if (dup) return 0;
@@ -56,47 +72,89 @@ export class NotificationCronService {
     const today = todayKst();
     let n = 0;
 
-    const settings = await this.prisma.userSettings.findUnique({ where: { user_id: userId } });
+    const settings = await this.prisma.userSettings.findUnique({
+      where: { user_id: userId },
+    });
 
     // 만기/결제 임박 알림(예적금·구독) — settings.notif_maturity 켜진 경우만
     if (settings?.notif_maturity ?? true) {
       // 2) 예적금 만기 D-30 / D-14 / D-7 / D-1 (매일 반복되지 않도록 정확히 해당 일자에만 발생)
       const maturityReminderDays = [30, 14, 7, 1];
       const savings = await this.prisma.saving.findMany({
-        where: { user_id: userId, deleted_at: null, maturity_date: { in: maturityReminderDays.map((d) => addDays(today, d)) } },
+        where: {
+          user_id: userId,
+          deleted_at: null,
+          maturity_date: {
+            in: maturityReminderDays.map((d) => addDays(today, d)),
+          },
+        },
       });
       for (const s of savings) {
-        const daysLeft = maturityReminderDays.find((d) => addDays(today, d).getTime() === new Date(s.maturity_date!).getTime()) ?? 0;
+        const daysLeft =
+          maturityReminderDays.find(
+            (d) =>
+              addDays(today, d).getTime() ===
+              new Date(s.maturity_date!).getTime(),
+          ) ?? 0;
         n += await this.emit(userId, {
-          group: 'ledger', tone: 'warning',
-          title: `${s.name} 만기 임박`, description: `예적금 만기가 ${daysLeft}일 남았습니다.`, source: '예적금',
+          group: 'ledger',
+          tone: 'warning',
+          title: `${s.name} 만기 임박`,
+          description: `예적금 만기가 ${daysLeft}일 남았습니다.`,
+          source: '예적금',
         });
       }
 
       // 2-1) ISA 등 투자 계좌 만기 D-30 / D-14 / D-7 / D-1
       const isaAccounts = await this.prisma.investmentAccount.findMany({
-        where: { user_id: userId, deleted_at: null, maturity_date: { in: maturityReminderDays.map((d) => addDays(today, d)) } },
+        where: {
+          user_id: userId,
+          deleted_at: null,
+          maturity_date: {
+            in: maturityReminderDays.map((d) => addDays(today, d)),
+          },
+        },
       });
       for (const a of isaAccounts) {
-        const daysLeft = maturityReminderDays.find((d) => addDays(today, d).getTime() === new Date(a.maturity_date!).getTime()) ?? 0;
+        const daysLeft =
+          maturityReminderDays.find(
+            (d) =>
+              addDays(today, d).getTime() ===
+              new Date(a.maturity_date!).getTime(),
+          ) ?? 0;
         n += await this.emit(userId, {
-          group: 'ledger', tone: 'warning',
-          title: `${a.name} 만기 임박`, description: `투자 계좌 만기가 ${daysLeft}일 남았습니다.`, source: '투자',
+          group: 'ledger',
+          tone: 'warning',
+          title: `${a.name} 만기 임박`,
+          description: `투자 계좌 만기가 ${daysLeft}일 남았습니다.`,
+          source: '투자',
         });
       }
 
       // 3) 구독 결제 D-1 / D-3 / D-7, 무료체험 종료 D-1 / D-3 / D-7 (매일 반복되지 않도록 정확히 해당 일자에만 발생)
       const reminderDays = [1, 3, 7];
       const subs = await this.prisma.subscription.findMany({
-        where: { user_id: userId, deleted_at: null, next_payment_date: { in: reminderDays.map((d) => addDays(today, d)) } },
+        where: {
+          user_id: userId,
+          deleted_at: null,
+          next_payment_date: { in: reminderDays.map((d) => addDays(today, d)) },
+        },
       });
       for (const s of subs) {
         const trial = s.status === 'trial';
-        const daysLeft = reminderDays.find((d) => addDays(today, d).getTime() === new Date(s.next_payment_date).getTime()) ?? 0;
+        const daysLeft =
+          reminderDays.find(
+            (d) =>
+              addDays(today, d).getTime() ===
+              new Date(s.next_payment_date).getTime(),
+          ) ?? 0;
         n += await this.emit(userId, {
-          group: 'ledger', tone: trial ? 'warning' : 'info',
+          group: 'ledger',
+          tone: trial ? 'warning' : 'info',
           title: trial ? `${s.name} 무료체험 종료 임박` : `${s.name} 결제 예정`,
-          description: trial ? `무료체험이 ${daysLeft}일 후 종료되어 과금됩니다.` : `구독 결제일이 ${daysLeft}일 남았습니다.`,
+          description: trial
+            ? `무료체험이 ${daysLeft}일 후 종료되어 과금됩니다.`
+            : `구독 결제일이 ${daysLeft}일 남았습니다.`,
           source: '구독',
         });
       }
@@ -106,10 +164,17 @@ export class NotificationCronService {
     if (settings?.notif_deadline ?? true) {
       const when = `${today.getUTCMonth() + 1}월 ${today.getUTCDate()}일`;
       for (const ev of await this.calendar.notifyTargetsOn(userId, today)) {
-        n += await this.emit(userId, {
-          group: 'ledger', tone: 'info',
-          title: ev.title, description: `오늘(${when}) ${CAL_TYPE_LABEL[ev.type] ?? '일정'}입니다.`, source: '캘린더',
-        }, { sameDescription: true, url: '/calendar' });
+        n += await this.emit(
+          userId,
+          {
+            group: 'ledger',
+            tone: 'info',
+            title: ev.title,
+            description: `오늘(${when}) ${CAL_TYPE_LABEL[ev.type] ?? '일정'}입니다.`,
+            source: '캘린더',
+          },
+          { sameDescription: true, url: '/calendar' },
+        );
       }
     }
 
@@ -120,17 +185,29 @@ export class NotificationCronService {
       // 정확히 90일째(그날 9시 이후 변경)가 빠져 첫 알림이 120일째에야 갔다
       const rotateBefore = addDays(today, -89);
       const stale = await this.prisma.credential.findMany({
-        where: { user_id: userId, deleted_at: null, password_changed_at: { lt: rotateBefore } },
+        where: {
+          user_id: userId,
+          deleted_at: null,
+          password_changed_at: { lt: rotateBefore },
+        },
         select: { name: true, password_changed_at: true },
       });
       for (const c of stale) {
         // 바꾼 날은 한국 날짜로 센다 (UTC 날짜로 세면 KST 0~9시에 바꾼 것이 하루 더 지난 것으로 셈)
         const changedDay = todayKst(c.password_changed_at!);
-        const daysStale = Math.round((today.getTime() - changedDay.getTime()) / MS_PER_DAY);
-        if (daysStale === 90 || (daysStale > 90 && (daysStale - 90) % 30 === 0)) {
+        const daysStale = Math.round(
+          (today.getTime() - changedDay.getTime()) / MS_PER_DAY,
+        );
+        if (
+          daysStale === 90 ||
+          (daysStale > 90 && (daysStale - 90) % 30 === 0)
+        ) {
           n += await this.emit(userId, {
-            group: 'system', tone: 'warning',
-            title: `'${c.name}' 비밀번호 교체 권장`, description: `비밀번호를 변경한 지 ${daysStale}일이 지났습니다.`, source: '계정 보관함',
+            group: 'system',
+            tone: 'warning',
+            title: `'${c.name}' 비밀번호 교체 권장`,
+            description: `비밀번호를 변경한 지 ${daysStale}일이 지났습니다.`,
+            source: '계정 보관함',
           });
         }
       }

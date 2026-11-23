@@ -1,4 +1,10 @@
-import { BadRequestException, ForbiddenException, HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  HttpException,
+  HttpStatus,
+  Injectable,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { randomBytes, scryptSync, timingSafeEqual } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
@@ -41,7 +47,9 @@ export class VaultService {
 
   // 설정 행 보장(없으면 기본값으로 생성) — 마스터 잠금 필드만 다룬다
   private async ensureSettings(userId: number) {
-    const row = await this.prisma.userSettings.findUnique({ where: { user_id: userId } });
+    const row = await this.prisma.userSettings.findUnique({
+      where: { user_id: userId },
+    });
     if (row) return row;
     return this.prisma.userSettings.create({
       data: {
@@ -67,7 +75,9 @@ export class VaultService {
   async setup(userId: number, password: string, timeoutMin: number) {
     assertNotDemo('마스터 잠금을 변경');
     if (!password || password.length < MIN_MASTER_PASSWORD) {
-      throw new BadRequestException(`마스터 비밀번호는 ${MIN_MASTER_PASSWORD}자 이상이어야 합니다.`);
+      throw new BadRequestException(
+        `마스터 비밀번호는 ${MIN_MASTER_PASSWORD}자 이상이어야 합니다.`,
+      );
     }
     await this.ensureSettings(userId);
     await this.prisma.userSettings.update({
@@ -85,29 +95,45 @@ export class VaultService {
   async disable(userId: number, password: string, client?: ClientInfo) {
     assertNotDemo('마스터 잠금을 해제');
     const row = await this.ensureSettings(userId);
-    if (row.master_lock_enabled && row.master_lock_hash && !this.matches(password, row.master_lock_hash)) {
+    if (
+      row.master_lock_enabled &&
+      row.master_lock_hash &&
+      !this.matches(password, row.master_lock_hash)
+    ) {
       throw new ForbiddenException('마스터 비밀번호가 일치하지 않습니다.');
     }
     await this.prisma.userSettings.update({
       where: { user_id: userId },
       data: { master_lock_enabled: false, master_lock_hash: null },
     });
-    await this.accessLog.log(userId, 'vault_disable', { type: 'security', id: userId, name: 'vault' }, client);
+    await this.accessLog.log(
+      userId,
+      'vault_disable',
+      { type: 'security', id: userId, name: 'vault' },
+      client,
+    );
     return { enabled: false };
   }
 
   // 마스터 잠금이 켜진 사용자면 유효한 vault 토큰을 요구 — 잠김/만료 시 423 + code:VAULT_LOCKED (VaultGuard·조건부 잠금 공용)
-  async assertUnlocked(userId: number, token: string | undefined): Promise<void> {
+  async assertUnlocked(
+    userId: number,
+    token: string | undefined,
+  ): Promise<void> {
     const settings = await this.prisma.userSettings.findUnique({
       where: { user_id: userId },
       select: { master_lock_enabled: true },
     });
     if (!settings?.master_lock_enabled) return;
-    if (!token) vaultLocked('보관함이 잠겨 있습니다. 마스터 비밀번호로 잠금을 해제하세요.');
+    if (!token)
+      vaultLocked(
+        '보관함이 잠겨 있습니다. 마스터 비밀번호로 잠금을 해제하세요.',
+      );
     try {
       // vault 전용 시크릿·알고리즘은 SecurityModule 의 JwtModule 설정으로 검증된다
       const payload = this.jwt.verify<{ sub: number; type: string }>(token);
-      if (payload.type !== 'vault' || payload.sub !== userId) throw new Error('invalid');
+      if (payload.type !== 'vault' || payload.sub !== userId)
+        throw new Error('invalid');
     } catch {
       vaultLocked('보관함 잠금이 만료되었습니다. 다시 잠금을 해제하세요.');
     }
@@ -123,10 +149,19 @@ export class VaultService {
       throw new ForbiddenException('마스터 비밀번호가 일치하지 않습니다.');
     }
     // timeout 0(수동 잠금만) 은 12시간으로 길게 둔다
-    const ttlSec = row.master_lock_timeout > 0 ? row.master_lock_timeout * 60 : 12 * 3600;
+    const ttlSec =
+      row.master_lock_timeout > 0 ? row.master_lock_timeout * 60 : 12 * 3600;
     // type 을 access 와 다르게 두어 Bearer 로 넣어도 JwtStrategy 가 거부한다(시크릿 분리와 이중 방어)
-    const token = this.jwt.sign({ sub: userId, type: 'vault' }, { expiresIn: ttlSec });
-    await this.accessLog.log(userId, 'vault_unlock', { type: 'security', id: userId, name: 'vault' }, client);
+    const token = this.jwt.sign(
+      { sub: userId, type: 'vault' },
+      { expiresIn: ttlSec },
+    );
+    await this.accessLog.log(
+      userId,
+      'vault_unlock',
+      { type: 'security', id: userId, name: 'vault' },
+      client,
+    );
     return { token, expiresIn: ttlSec };
   }
 }

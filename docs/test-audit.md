@@ -113,19 +113,19 @@
 
 | 흐름 | 코드 | 현재 | 왜 중요한가 |
 | --- | --- | --- | --- |
-| 전역 JWT 가드 + `@Public` 예외 — 로그인 없이 열린 엔드포인트가 없는지 | `app.module.ts:97`, 각 컨트롤러 | 컨트롤러 테스트 0개 · e2e 미실행 | 데코레이터 하나 잘못 붙이면 보관함 API 가 열린다 |
+| 전역 JWT 가드 + `@Public` 예외 — 로그인 없이 열린 엔드포인트가 없는지 | `app.module.ts:105`, 각 컨트롤러 | 컨트롤러 테스트 0개 · e2e 미실행 | 데코레이터 하나 잘못 붙이면 보관함 API 가 열린다 |
 | refresh 쿠키 속성(`httpOnly` · `SameSite=Lax`) | `auth/auth.controller.ts:43`~`:58` | 없음 | 2026-10-09 CSRF 수정 지점 — 되돌아가도 테스트가 못 잡는다 |
 | 구글 로그인의 `ALLOWED_EMAILS` 거부 | `auth/auth.module.ts:23` → core-auth | 이 레포엔 없음 (이메일 코드 쪽만 있음) | 화이트리스트가 유일한 접근 제한이다. core-auth(young-core) 쪽 테스트가 있는지 확인 필요 |
 | Rate limit(`@Throttle`) — 비번 열람 · TOTP · 보관함 잠금해제 | `credential/credential.controller.ts` 등 6곳 | 없음 | 무차별 대입 방어 |
 | 암호문 컬럼 쓰기 가드 — 평문이 `_enc` 컬럼에 저장되지 않는지 | `prisma/prisma.service.ts` (core-security `encryptedFields`) | 없음 (`crypto-fields.spec` 은 목록 대조만) | 가드가 빠지면 평문 비번이 DB 에 그대로 남는다 |
 | 데이터 내보내기 — 계정 JSON 의 이메일 문맥 암호화 · 전체 ZIP | `export/export.service.ts` | 없음 (복원 쪽 `import` 만 있음) | 내보내기 → 가져오기 왕복이 깨지면 백업이 쓸모없어진다 |
-| 순자산 월말 스냅샷 + 현금 델타 | `maintenance/net-worth-snapshot-cron.service.ts`, `asset/asset.service.ts:66` | 크론 테스트 없음 · 델타 경로 미검증 (가짜 후보 ③) | 대시보드 첫 숫자. 이중 계산 버그가 실제로 있었던 곳 |
-| 가계부 목록 · 월 요약 · 월별 추이 합계 | `transaction/transaction.service.ts:243`~`:322` | 없음 (자산이동 잔액만 있음) | 화면의 수입 · 지출 · 잔액 숫자 |
-| 반복거래 회차 생성 (멱등 · 시작일 이전 회차 제외 · 자산이동 일괄 반영) | `transaction/transaction.service.ts:148`~`:203` | 없음 (순수 함수 `recurring.util` 만) | 매일 크론이 돈다 — 두 번 생성되면 돈이 두 번 빠진다. 반복매수 쪽(`investment`)은 테스트가 있다 |
-| 가계부 엑셀 가져오기 · 내보내기 | `transaction/transaction.service.ts:354`, `:448` | 없음 (계정 엑셀만 있음) | 대량 입력 경로 |
+| 순자산 월말 스냅샷 + 현금 델타 | `maintenance/net-worth-snapshot-cron.service.ts`, `asset/asset.service.ts:74` | 크론 테스트 없음 · 델타 경로 미검증 (가짜 후보 ③) | 대시보드 첫 숫자. 이중 계산 버그가 실제로 있었던 곳 |
+| 가계부 목록 · 월 요약 · 월별 추이 합계 | `transaction/transaction.service.ts:314`~`:416` | 없음 (자산이동 잔액만 있음) | 화면의 수입 · 지출 · 잔액 숫자 |
+| 반복거래 회차 생성 (멱등 · 시작일 이전 회차 제외 · 자산이동 일괄 반영) | `transaction/transaction.service.ts:186`~`:267` | 없음 (순수 함수 `recurring.util` 만) | 매일 크론이 돈다 — 두 번 생성되면 돈이 두 번 빠진다. 반복매수 쪽(`investment`)은 테스트가 있다 |
+| 가계부 엑셀 가져오기 · 내보내기 | `transaction/transaction.service.ts:449`, `:563` | 없음 (계정 엑셀만 있음) | 대량 입력 경로 |
 | 알림 크론 — 만기 · 결제 D-day 정확히 그날만, 같은 제목 미읽음이면 건너뜀 | `maintenance/notification-cron.service.ts` | 없음 | 매일 반복 알림 · 누락 |
 | 알림 + 푸시 한 트랜잭션 (`createWithPush`) | `notification/notification.service.ts` | 없음 (아웃박스 저장소만) | 롤백 시 푸시가 나가지 않아야 한다 |
-| 세션 강제 로그아웃 — refresh 폐기 + 그 기기 푸시 삭제 | `security/security.service.ts:36`~`:70` | 없음 (로그아웃 쪽은 있음) | 2026-10-15 수정("로그아웃한 기기로 알림이 가지 않게") 지점 |
+| 세션 강제 로그아웃 — refresh 폐기 + 그 기기 푸시 삭제 | `security/security.service.ts:36`~`:89` | 없음 (로그아웃 쪽은 있음) | 2026-10-15 수정("로그아웃한 기기로 알림이 가지 않게") 지점 |
 | 캘린더 반복 · 음력 일정 펼치기 | `calendar/calendar.service.ts` | 없음 | 음력 변환 · 윤달 · 반복 종료일 경계 |
 | 휴지통 영구삭제 크론 | `maintenance/trash-cron.service.ts` | 없음 | 매일 데이터를 지운다 (구독 결제일 넘기기 크론은 2026-10-22 가계부 자동 등록을 넣으면서 `subscription-cron.service.spec.ts` 를 만들었다) |
 | 대시보드 현금흐름 예측 · 통합 D-day | `dashboard/dashboard.service.ts` | 없음 | 주기 환산(주 52/12 · 평일 261/12) |
@@ -143,3 +143,11 @@
 | test | 통과 — 31 suites · 284 tests | 통과 — 4 files · 34 tests |
 
 backend lint 가 지금까지 드러나지 않은 이유: `package.json` 의 `lint` 스크립트가 `--fix` 로 돌고, 도커 빌드(`backend/Dockerfile`)에는 lint 단계가 없다(frontend 는 있다). CI 는 이 상태 그대로 실패한다 — 서식은 `pnpm lint`(--fix) 한 번으로 1,090개가 고쳐지고, 나머지는 손으로 봐야 한다.
+
+**2026-11-23 정리 — backend lint 0건.** 정리 직전 CI 는 2,325 문제(오류 2,186 · 경고 139)였다.
+
+- 서식: `pnpm format`(prettier)
+- spec 파일(`*.spec.ts` · `test/`): `eslint.config.mjs` 에서 `no-unsafe-*` · `require-await` · `unbound-method` 를 껐다. 가짜 객체는 일부러 `any` 로 만든다 — 세 안(spec 만 규칙 완화 · 가짜 객체에 타입 붙이기 · 둘 섞기) 중 사용자가 골랐다. 대신 spec 안의 타입 실수는 lint 가 잡지 않는다
+- 소스에 남은 54건: 외부 API 응답(네이버 · 야후 · frankfurter · 공휴일) 타입, 안 쓰는 import · 인자, `void bootstrap()` 등을 손으로 고쳤다
+- CI lint 단계의 `continue-on-error` 를 지우고 `--max-warnings 0` 을 붙였다 — 이제 lint 오류 · 경고가 있으면 배포까지 막힌다
+- 서식 정리로 줄이 밀려 이 문서와 `index-design.md` 의 `파일:줄` 을 같은 곳을 가리키게 다시 맞췄다

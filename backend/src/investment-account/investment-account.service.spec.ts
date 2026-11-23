@@ -18,7 +18,9 @@ describe('InvestmentAccountService', () => {
   let investments: any[];
   let seq: number;
   let prisma: any;
-  const priceLookup = { getExchangeRate: jest.fn(async () => 1300) } as unknown as PriceLookupService;
+  const priceLookup = {
+    getExchangeRate: jest.fn(async () => 1300),
+  } as unknown as PriceLookupService;
   const svc = () => new InvestmentAccountService(prisma, crypto, priceLookup);
 
   beforeEach(() => {
@@ -35,8 +37,14 @@ describe('InvestmentAccountService', () => {
               (!where.name || a.name.includes(where.name.contains)),
           ),
         ),
-        findFirst: jest.fn(async ({ where }: any) =>
-          accounts.find((a) => a.id === where.id && a.user_id === where.user_id && a.deleted_at == null) ?? null,
+        findFirst: jest.fn(
+          async ({ where }: any) =>
+            accounts.find(
+              (a) =>
+                a.id === where.id &&
+                a.user_id === where.user_id &&
+                a.deleted_at == null,
+            ) ?? null,
         ),
         create: jest.fn(async ({ data }: any) => {
           const row = { id: seq++, deleted_at: null, ...data };
@@ -47,14 +55,18 @@ describe('InvestmentAccountService', () => {
           const row = accounts.find((a) => a.id === where.id);
           for (const [k, v] of Object.entries(data)) {
             if (v === undefined) continue;
-            (row as any)[k] = v && typeof v === 'object' && 'increment' in v
-              ? (row as any)[k].add(v.increment)
-              : v;
+            row[k] =
+              v && typeof v === 'object' && 'increment' in v
+                ? row[k].add(v.increment)
+                : v;
           }
           return row;
         }),
-        count: jest.fn(async ({ where }: any) =>
-          accounts.filter((a) => a.user_id === where.user_id && a.deleted_at == null).length,
+        count: jest.fn(
+          async ({ where }: any) =>
+            accounts.filter(
+              (a) => a.user_id === where.user_id && a.deleted_at == null,
+            ).length,
         ),
       },
       investment: {
@@ -66,38 +78,68 @@ describe('InvestmentAccountService', () => {
               i.deleted_at == null,
           ),
         ),
-        count: jest.fn(async ({ where }: any) =>
-          investments.filter((i) => i.account_id === where.account_id && i.deleted_at == null).length,
+        count: jest.fn(
+          async ({ where }: any) =>
+            investments.filter(
+              (i) => i.account_id === where.account_id && i.deleted_at == null,
+            ).length,
         ),
       },
-      $transaction: jest.fn(async (arg: any) => (Array.isArray(arg) ? Promise.all(arg) : arg(prisma))),
+      $transaction: jest.fn(async (arg: any) =>
+        Array.isArray(arg) ? Promise.all(arg) : arg(prisma),
+      ),
     };
   });
 
   it('create: 계좌번호 암호화 저장, cashBalance 미입력 시 0', async () => {
-    const res = await svc().create(1, { name: '토스증권', accountNumber: '110-1234567890' } as any);
+    const res = await svc().create(1, {
+      name: '토스증권',
+      accountNumber: '110-1234567890',
+    });
     expect(res.cashBalance).toBe(0);
     expect(accounts[0].account_number_enc).toMatch(/^v2:test:/);
-    expect(crypto.decrypt(accounts[0].account_number_enc, ACCT)).toBe('110-1234567890');
+    expect(crypto.decrypt(accounts[0].account_number_enc, ACCT)).toBe(
+      '110-1234567890',
+    );
   });
 
   it('findAll: 계좌번호 중간 마스킹(앞3/뒤4 노출)', async () => {
-    await svc().create(1, { name: 'A', accountNumber: '110-1234567890' } as any);
+    await svc().create(1, {
+      name: 'A',
+      accountNumber: '110-1234567890',
+    });
     const [res] = (await svc().findAll(1)) as any[];
-    expect(res.accountNumber).toBe(`110${'•'.repeat('110-1234567890'.length - 7)}7890`);
+    expect(res.accountNumber).toBe(
+      `110${'•'.repeat('110-1234567890'.length - 7)}7890`,
+    );
   });
 
   it('findAll: 계좌번호가 짧으면(7자 이하) 마스킹 없이 그대로 노출', async () => {
-    await svc().create(1, { name: 'A', accountNumber: '12345' } as any);
+    await svc().create(1, { name: 'A', accountNumber: '12345' });
     const [res] = (await svc().findAll(1)) as any[];
     expect(res.accountNumber).toBe('12345');
   });
 
   it('findAll: 보유종목 집계(개수/원금합/평가금합)가 계좌별로 병합됨', async () => {
-    const account = await svc().create(1, { name: 'A', accountNumber: '110-1234567890' } as any);
+    const account = await svc().create(1, {
+      name: 'A',
+      accountNumber: '110-1234567890',
+    });
     investments.push(
-      { user_id: 1, account_id: account.id, deleted_at: null, principal: new Prisma.Decimal(1000), current_value: new Prisma.Decimal(1200) },
-      { user_id: 1, account_id: account.id, deleted_at: null, principal: new Prisma.Decimal(500), current_value: new Prisma.Decimal(400) },
+      {
+        user_id: 1,
+        account_id: account.id,
+        deleted_at: null,
+        principal: new Prisma.Decimal(1000),
+        current_value: new Prisma.Decimal(1200),
+      },
+      {
+        user_id: 1,
+        account_id: account.id,
+        deleted_at: null,
+        principal: new Prisma.Decimal(500),
+        current_value: new Prisma.Decimal(400),
+      },
     );
     const [res] = (await svc().findAll(1)) as any[];
     expect(res.holdingsCount).toBe(2);
@@ -106,74 +148,138 @@ describe('InvestmentAccountService', () => {
   });
 
   it('summary: 총 예수금/계좌 수', async () => {
-    await svc().create(1, { name: 'A', accountNumber: '1', cashBalance: 1000 } as any);
-    await svc().create(1, { name: 'B', accountNumber: '2', cashBalance: 2000 } as any);
+    await svc().create(1, {
+      name: 'A',
+      accountNumber: '1',
+      cashBalance: 1000,
+    });
+    await svc().create(1, {
+      name: 'B',
+      accountNumber: '2',
+      cashBalance: 2000,
+    });
     const res = await svc().summary(1);
     expect(res).toEqual({ totalCash: 3000, accountCount: 2 });
   });
 
   it('update: 계좌번호 빈 문자열이면 null로 삭제', async () => {
-    const account = await svc().create(1, { name: 'A', accountNumber: '110-1234567890' } as any);
-    await svc().update(1, account.id, { accountNumber: '' } as any);
+    const account = await svc().create(1, {
+      name: 'A',
+      accountNumber: '110-1234567890',
+    });
+    await svc().update(1, account.id, { accountNumber: '' });
     expect(accounts[0].account_number_enc).toBeNull();
   });
 
   it('update: 존재하지 않는 계좌는 NotFound', async () => {
-    await expect(svc().update(1, 999, { name: 'X' } as any)).rejects.toThrow(NotFoundException);
+    await expect(svc().update(1, 999, { name: 'X' } as any)).rejects.toThrow(
+      NotFoundException,
+    );
   });
 
   it('remove: 보유 종목이 있으면 차단', async () => {
-    const account = await svc().create(1, { name: 'A', accountNumber: '1' } as any);
+    const account = await svc().create(1, {
+      name: 'A',
+      accountNumber: '1',
+    });
     investments.push({ user_id: 1, account_id: account.id, deleted_at: null });
-    await expect(svc().remove(1, account.id)).rejects.toThrow(BadRequestException);
+    await expect(svc().remove(1, account.id)).rejects.toThrow(
+      BadRequestException,
+    );
   });
 
   it('remove: 보유 종목이 없으면 soft delete', async () => {
-    const account = await svc().create(1, { name: 'A', accountNumber: '1' } as any);
+    const account = await svc().create(1, {
+      name: 'A',
+      accountNumber: '1',
+    });
     await svc().remove(1, account.id);
     expect(accounts[0].deleted_at).toBeInstanceOf(Date);
   });
 
   it('remove: 타인 계좌는 NotFound', async () => {
-    const account = await svc().create(1, { name: 'A', accountNumber: '1' } as any);
-    await expect(svc().remove(2, account.id)).rejects.toThrow(NotFoundException);
+    const account = await svc().create(1, {
+      name: 'A',
+      accountNumber: '1',
+    });
+    await expect(svc().remove(2, account.id)).rejects.toThrow(
+      NotFoundException,
+    );
   });
 
   it('exchange: 원화→달러, rate 미입력 시 실시간 환율로 계산', async () => {
-    const account = await svc().create(1, { name: 'A', accountNumber: '1', cashBalance: 130_000 } as any);
-    const res = await svc().exchange(1, account.id, { direction: ExchangeDirection.KRW_TO_USD, amount: 130_000 } as any);
+    const account = await svc().create(1, {
+      name: 'A',
+      accountNumber: '1',
+      cashBalance: 130_000,
+    });
+    const res = await svc().exchange(1, account.id, {
+      direction: ExchangeDirection.KRW_TO_USD,
+      amount: 130_000,
+    });
     expect(priceLookup.getExchangeRate).toHaveBeenCalledWith('USD', 'KRW');
     expect(res.cashBalance).toBe(0);
     expect(res.cashBalanceUsd).toBe(100);
   });
 
   it('exchange: 달러→원화, rate 직접 입력 시 그 값 사용', async () => {
-    const account = await svc().create(1, { name: 'A', accountNumber: '1', cashBalanceUsd: 100 } as any);
-    const res = await svc().exchange(1, account.id, { direction: ExchangeDirection.USD_TO_KRW, amount: 100, rate: 1400 } as any);
+    const account = await svc().create(1, {
+      name: 'A',
+      accountNumber: '1',
+      cashBalanceUsd: 100,
+    });
+    const res = await svc().exchange(1, account.id, {
+      direction: ExchangeDirection.USD_TO_KRW,
+      amount: 100,
+      rate: 1400,
+    });
     expect(res.cashBalanceUsd).toBe(0);
     expect(res.cashBalance).toBe(140_000);
   });
 
   it('exchange: 받는 금액(toAmount)을 주면 환율 계산 없이 그 값을 그대로 더함', async () => {
     (priceLookup.getExchangeRate as jest.Mock).mockClear();
-    const account = await svc().create(1, { name: 'A', accountNumber: '1', cashBalance: 605_903, cashBalanceUsd: 99.98 } as any);
-    const res = await svc().exchange(1, account.id, { direction: ExchangeDirection.KRW_TO_USD, amount: 200_590, toAmount: 150 } as any);
+    const account = await svc().create(1, {
+      name: 'A',
+      accountNumber: '1',
+      cashBalance: 605_903,
+      cashBalanceUsd: 99.98,
+    });
+    const res = await svc().exchange(1, account.id, {
+      direction: ExchangeDirection.KRW_TO_USD,
+      amount: 200_590,
+      toAmount: 150,
+    });
     expect(priceLookup.getExchangeRate).not.toHaveBeenCalled();
     expect(res.cashBalance).toBe(405_313);
     expect(res.cashBalanceUsd).toBe(249.98);
   });
 
   it('exchange: 원화 부족하면 BadRequest', async () => {
-    const account = await svc().create(1, { name: 'A', accountNumber: '1', cashBalance: 1000 } as any);
+    const account = await svc().create(1, {
+      name: 'A',
+      accountNumber: '1',
+      cashBalance: 1000,
+    });
     await expect(
-      svc().exchange(1, account.id, { direction: ExchangeDirection.KRW_TO_USD, amount: 2000 } as any),
+      svc().exchange(1, account.id, {
+        direction: ExchangeDirection.KRW_TO_USD,
+        amount: 2000,
+      } as any),
     ).rejects.toThrow(BadRequestException);
   });
 
   it('exchange: 달러 부족하면 BadRequest', async () => {
-    const account = await svc().create(1, { name: 'A', accountNumber: '1', cashBalanceUsd: 10 } as any);
+    const account = await svc().create(1, {
+      name: 'A',
+      accountNumber: '1',
+      cashBalanceUsd: 10,
+    });
     await expect(
-      svc().exchange(1, account.id, { direction: ExchangeDirection.USD_TO_KRW, amount: 20 } as any),
+      svc().exchange(1, account.id, {
+        direction: ExchangeDirection.USD_TO_KRW,
+        amount: 20,
+      } as any),
     ).rejects.toThrow(BadRequestException);
   });
 });

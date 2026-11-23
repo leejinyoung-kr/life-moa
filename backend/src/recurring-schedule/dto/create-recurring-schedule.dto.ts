@@ -1,8 +1,4 @@
-import {
-  RecurringKind,
-  TransactionType,
-  TransferTarget,
-} from '@prisma/client';
+import { RecurringKind, TransactionType, TransferTarget } from '@prisma/client';
 import {
   IsBoolean,
   IsDateString,

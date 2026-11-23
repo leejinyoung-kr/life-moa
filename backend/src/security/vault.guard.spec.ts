@@ -7,7 +7,10 @@ describe('VaultGuard', () => {
   let prisma: any;
   let jwt: any;
 
-  const ctx = (user: any, headers: Record<string, any> = {}): ExecutionContext =>
+  const ctx = (
+    user: any,
+    headers: Record<string, any> = {},
+  ): ExecutionContext =>
     ({
       switchToHttp: () => ({
         getRequest: () => ({ user, headers }),
@@ -20,7 +23,8 @@ describe('VaultGuard', () => {
   });
 
   // 검사 로직은 VaultService.assertUnlocked 에 있으므로 실제 서비스를 가짜 prisma/jwt 로 감싸 쓴다
-  const guard = () => new VaultGuard(new VaultService(prisma, jwt, { log: jest.fn() } as any));
+  const guard = () =>
+    new VaultGuard(new VaultService(prisma, jwt, { log: jest.fn() } as any));
 
   it('인증되지 않은 요청(req.user 없음)은 통과시킨다', async () => {
     await expect(guard().canActivate(ctx(undefined))).resolves.toBe(true);
@@ -33,12 +37,16 @@ describe('VaultGuard', () => {
   });
 
   it('마스터 잠금 비활성화면 통과시킨다', async () => {
-    prisma.userSettings.findUnique.mockResolvedValue({ master_lock_enabled: false });
+    prisma.userSettings.findUnique.mockResolvedValue({
+      master_lock_enabled: false,
+    });
     await expect(guard().canActivate(ctx({ id: 1 }))).resolves.toBe(true);
   });
 
   it('잠금 활성 + 토큰 없음 -> 423 LOCKED', async () => {
-    prisma.userSettings.findUnique.mockResolvedValue({ master_lock_enabled: true });
+    prisma.userSettings.findUnique.mockResolvedValue({
+      master_lock_enabled: true,
+    });
     const promise = guard().canActivate(ctx({ id: 1 }));
     await expect(promise).rejects.toThrow(HttpException);
     await expect(promise).rejects.toMatchObject({
@@ -48,45 +56,71 @@ describe('VaultGuard', () => {
   });
 
   it('잠금 활성 + 토큰 검증 실패 -> 423 LOCKED', async () => {
-    prisma.userSettings.findUnique.mockResolvedValue({ master_lock_enabled: true });
+    prisma.userSettings.findUnique.mockResolvedValue({
+      master_lock_enabled: true,
+    });
     jwt.verify.mockImplementation(() => {
       throw new Error('invalid token');
     });
-    const promise = guard().canActivate(ctx({ id: 1 }, { 'x-vault-token': 'bad' }));
+    const promise = guard().canActivate(
+      ctx({ id: 1 }, { 'x-vault-token': 'bad' }),
+    );
     await expect(promise).rejects.toMatchObject({ status: HttpStatus.LOCKED });
   });
 
   it('잠금 활성 + type 이 vault 가 아니면 -> 423 LOCKED', async () => {
-    prisma.userSettings.findUnique.mockResolvedValue({ master_lock_enabled: true });
+    prisma.userSettings.findUnique.mockResolvedValue({
+      master_lock_enabled: true,
+    });
     jwt.verify.mockReturnValue({ sub: 1, type: 'access' });
-    const promise = guard().canActivate(ctx({ id: 1 }, { 'x-vault-token': 'tok' }));
+    const promise = guard().canActivate(
+      ctx({ id: 1 }, { 'x-vault-token': 'tok' }),
+    );
     await expect(promise).rejects.toMatchObject({ status: HttpStatus.LOCKED });
   });
 
   it('잠금 활성 + type 없이 scope 만 있는 이전 형식 토큰이면 -> 423 LOCKED', async () => {
-    prisma.userSettings.findUnique.mockResolvedValue({ master_lock_enabled: true });
+    prisma.userSettings.findUnique.mockResolvedValue({
+      master_lock_enabled: true,
+    });
     jwt.verify.mockReturnValue({ sub: 1, scope: 'vault' });
-    const promise = guard().canActivate(ctx({ id: 1 }, { 'x-vault-token': 'tok' }));
+    const promise = guard().canActivate(
+      ctx({ id: 1 }, { 'x-vault-token': 'tok' }),
+    );
     await expect(promise).rejects.toMatchObject({ status: HttpStatus.LOCKED });
   });
 
   it('잠금 활성 + 다른 사용자(sub 불일치) 토큰이면 -> 423 LOCKED', async () => {
-    prisma.userSettings.findUnique.mockResolvedValue({ master_lock_enabled: true });
+    prisma.userSettings.findUnique.mockResolvedValue({
+      master_lock_enabled: true,
+    });
     jwt.verify.mockReturnValue({ sub: 2, type: 'vault' });
-    const promise = guard().canActivate(ctx({ id: 1 }, { 'x-vault-token': 'tok' }));
+    const promise = guard().canActivate(
+      ctx({ id: 1 }, { 'x-vault-token': 'tok' }),
+    );
     await expect(promise).rejects.toMatchObject({ status: HttpStatus.LOCKED });
   });
 
   it('잠금 활성 + 본인 vault 토큰이면 통과시킨다', async () => {
-    prisma.userSettings.findUnique.mockResolvedValue({ master_lock_enabled: true });
+    prisma.userSettings.findUnique.mockResolvedValue({
+      master_lock_enabled: true,
+    });
     jwt.verify.mockReturnValue({ sub: 1, type: 'vault' });
-    await expect(guard().canActivate(ctx({ id: 1 }, { 'x-vault-token': 'tok' }))).resolves.toBe(true);
+    await expect(
+      guard().canActivate(ctx({ id: 1 }, { 'x-vault-token': 'tok' })),
+    ).resolves.toBe(true);
   });
 
   it('헤더가 배열로 전달되어도 첫 번째 값을 토큰으로 사용한다', async () => {
-    prisma.userSettings.findUnique.mockResolvedValue({ master_lock_enabled: true });
+    prisma.userSettings.findUnique.mockResolvedValue({
+      master_lock_enabled: true,
+    });
     jwt.verify.mockReturnValue({ sub: 1, type: 'vault' });
-    await expect(guard().canActivate(ctx({ id: 1 }, { 'x-vault-token': ['tok', 'extra'] }))).resolves.toBe(true);
+    await expect(
+      guard().canActivate(
+        ctx({ id: 1 }, { 'x-vault-token': ['tok', 'extra'] }),
+      ),
+    ).resolves.toBe(true);
     expect(jwt.verify).toHaveBeenCalledWith('tok');
   });
 });

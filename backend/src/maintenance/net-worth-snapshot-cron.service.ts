@@ -33,22 +33,49 @@ export class NetWorthSnapshotCronService {
         const summary = await this.assetService.summary(u.id);
         // cash_total은 summary()의 델타 계산 기준점이 되므로 전체 재집계로 정확히 저장 — 뒤늦은 거래 수정도 여기서 자연 치유됨
         // total_debt: 부채(자산관리) 기능 제거 이후로는 항상 0 — 과거 스냅샷의 기록값은 그대로 유지
-        const cashTotal = await this.assetService.cashTotalForSnapshot(u.id, month);
+        const cashTotal = await this.assetService.cashTotalForSnapshot(
+          u.id,
+          month,
+        );
         await this.prisma.netWorthSnapshot.upsert({
           where: { user_id_month: { user_id: u.id, month } },
-          create: { user_id: u.id, month, total_assets: summary.totalAssets, total_debt: 0, cash_total: cashTotal },
-          update: { total_assets: summary.totalAssets, total_debt: 0, cash_total: cashTotal },
+          create: {
+            user_id: u.id,
+            month,
+            total_assets: summary.totalAssets,
+            total_debt: 0,
+            cash_total: cashTotal,
+          },
+          update: {
+            total_assets: summary.totalAssets,
+            total_debt: 0,
+            cash_total: cashTotal,
+          },
         });
         ok++;
       } catch (e) {
-        this.logger.warn(`순자산 스냅샷 실패(user ${u.id}): ${(e as Error).message}`);
-        this.sysLog.error({ userId: u.id, category: 'asset', message: '순자산 스냅샷 저장 실패', metadata: { month, error: (e as Error).message } });
+        this.logger.warn(
+          `순자산 스냅샷 실패(user ${u.id}): ${(e as Error).message}`,
+        );
+        this.sysLog.error({
+          userId: u.id,
+          category: 'asset',
+          message: '순자산 스냅샷 저장 실패',
+          metadata: { month, error: (e as Error).message },
+        });
       }
     }
 
     if (ok) {
-      this.sysLog.info({ category: 'asset', message: `순자산 스냅샷 ${ok}건 저장 (${month})`, metadata: { month, total: users.length, ok } });
+      this.sysLog.info({
+        category: 'asset',
+        message: `순자산 스냅샷 ${ok}건 저장 (${month})`,
+        metadata: { month, total: users.length, ok },
+      });
     }
-    return finishPerUser(`순자산 스냅샷 ${ok}/${users.length}명 저장 (${month})`, users.length - ok);
+    return finishPerUser(
+      `순자산 스냅샷 ${ok}/${users.length}명 저장 (${month})`,
+      users.length - ok,
+    );
   }
 }

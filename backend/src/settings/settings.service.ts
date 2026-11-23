@@ -11,7 +11,9 @@ export class SettingsService {
 
   // 설정 행 조회, 없으면 기본값으로 생성 (1:1 보장)
   private async getOrCreate(userId: number): Promise<UserSettings> {
-    const existing = await this.prisma.userSettings.findUnique({ where: { user_id: userId } });
+    const existing = await this.prisma.userSettings.findUnique({
+      where: { user_id: userId },
+    });
     if (existing) return existing;
     return this.prisma.userSettings.create({
       data: {
@@ -23,14 +25,22 @@ export class SettingsService {
 
   // 구글 계정과 연결됐는지 — 이메일 인증코드로만 만든 계정은 google_id 가 없다
   private async isGoogleLinked(userId: number): Promise<boolean> {
-    const row = await this.prisma.user.findUnique({ where: { id: userId }, select: { google_id: true } });
+    const row = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { google_id: true },
+    });
     return !!row?.google_id;
   }
 
   // 엔티티 → 응답 DTO. user(토큰)에서 계정 정보, 설정행에서 선호값.
   private toDto(s: UserSettings, user: AuthUser, google: boolean) {
     return {
-      user: { email: user.email, name: user.name, picture: user.picture, google },
+      user: {
+        email: user.email,
+        name: user.name,
+        picture: user.picture,
+        google,
+      },
       displayName: s.display_name ?? user.name,
       notifUpload: s.notif_upload,
       notifMaturity: s.notif_maturity,
@@ -62,7 +72,7 @@ export class SettingsService {
       show_holidays: dto.showHolidays,
       session_expiry: dto.sessionExpiry,
       pw_auto_hide: dto.pwAutoHide,
-      categories: dto.categories as Prisma.InputJsonValue,
+      categories: dto.categories,
     };
     const updated = await this.prisma.userSettings.update({
       where: { user_id: user.id },

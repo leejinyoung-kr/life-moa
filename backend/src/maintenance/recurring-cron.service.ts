@@ -21,7 +21,10 @@ export class RecurringCronService {
 
   // 실제 증권시장은 평일에만 열리므로 KST 기준 토/일요일에는 매수·현재가 갱신을 건너뛴다
   private isWeekdayKST(): boolean {
-    const day = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Seoul', weekday: 'short' }).format(new Date());
+    const day = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Seoul',
+      weekday: 'short',
+    }).format(new Date());
     return day !== 'Sat' && day !== 'Sun';
   }
 
@@ -42,7 +45,9 @@ export class RecurringCronService {
         txCount += await this.transactionService.materializeRecurring(u.id);
       } catch (err) {
         txFailed += 1;
-        this.logger.error(`사용자 ${u.id} 반복거래 처리 실패: ${(err as Error).message}`);
+        this.logger.error(
+          `사용자 ${u.id} 반복거래 처리 실패: ${(err as Error).message}`,
+        );
         this.sysLog.error({
           userId: u.id,
           category: 'cron',
@@ -54,11 +59,16 @@ export class RecurringCronService {
       if (!weekday) continue;
 
       try {
-        buyCount += await this.investmentService.materializeRecurringBuys(u.id, 'domestic');
+        buyCount += await this.investmentService.materializeRecurringBuys(
+          u.id,
+          'domestic',
+        );
         await this.investmentService.refreshCurrentValues(u.id, 'domestic');
       } catch (err) {
         buyFailed += 1;
-        this.logger.error(`사용자 ${u.id} 반복매수(국내) 처리 실패: ${(err as Error).message}`);
+        this.logger.error(
+          `사용자 ${u.id} 반복매수(국내) 처리 실패: ${(err as Error).message}`,
+        );
         this.sysLog.error({
           userId: u.id,
           category: 'cron',
@@ -86,8 +96,13 @@ export class RecurringCronService {
       });
     }
 
-    const buys = weekday ? `반복매수(국내) ${buyCount}건` : '반복매수(국내) 주말 건너뜀';
-    return finishPerUser(`반복거래 ${txCount}건·${buys} (사용자 ${users.length}명)`, txFailed + buyFailed);
+    const buys = weekday
+      ? `반복매수(국내) ${buyCount}건`
+      : '반복매수(국내) 주말 건너뜀';
+    return finishPerUser(
+      `반복거래 ${txCount}건·${buys} (사용자 ${users.length}명)`,
+      txFailed + buyFailed,
+    );
   }
 
   // 반복매수(해외) — 미국 장이 열린 직후인 밤 11시(KST)에 돌려, 전날 종가에 고정된 가격이 아닌
@@ -102,11 +117,16 @@ export class RecurringCronService {
 
     for (const u of users) {
       try {
-        recurringCount += await this.investmentService.materializeRecurringBuys(u.id, 'foreign');
+        recurringCount += await this.investmentService.materializeRecurringBuys(
+          u.id,
+          'foreign',
+        );
         await this.investmentService.refreshCurrentValues(u.id, 'foreign');
       } catch (err) {
         failed += 1;
-        this.logger.error(`사용자 ${u.id} 반복매수(해외) 처리 실패: ${(err as Error).message}`);
+        this.logger.error(
+          `사용자 ${u.id} 반복매수(해외) 처리 실패: ${(err as Error).message}`,
+        );
         this.sysLog.error({
           userId: u.id,
           category: 'cron',
@@ -125,6 +145,9 @@ export class RecurringCronService {
       });
     }
 
-    return finishPerUser(`반복매수(해외) ${recurringCount}건 (사용자 ${users.length}명)`, failed);
+    return finishPerUser(
+      `반복매수(해외) ${recurringCount}건 (사용자 ${users.length}명)`,
+      failed,
+    );
   }
 }

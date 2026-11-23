@@ -21,7 +21,9 @@ describe('billing-date.util', () => {
 
   it('연 주기는 윤일을 평년 2/28 로 맞추고 윤년엔 2/29 로 돌아간다', () => {
     expect(addCycle(d('2028-02-29'), 'yearly', 29)).toEqual(d('2029-02-28'));
-    expect(rollForward(d('2029-02-28'), 'yearly', 29, d('2032-01-01'))).toEqual(d('2032-02-29'));
+    expect(rollForward(d('2029-02-28'), 'yearly', 29, d('2032-01-01'))).toEqual(
+      d('2032-02-29'),
+    );
   });
 
   it('주 주기는 7일 뒤', () => {
@@ -29,19 +31,29 @@ describe('billing-date.util', () => {
   });
 
   it('여러 주기가 지났으면 오늘 이후 첫 결제일까지 넘긴다', () => {
-    expect(rollForward(d('2026-07-10'), 'monthly', 10, d('2026-10-05'))).toEqual(d('2026-10-10'));
-    expect(rollForward(d('2026-01-31'), 'monthly', 31, d('2026-03-05'))).toEqual(d('2026-03-31'));
+    expect(
+      rollForward(d('2026-07-10'), 'monthly', 10, d('2026-10-05')),
+    ).toEqual(d('2026-10-10'));
+    expect(
+      rollForward(d('2026-01-31'), 'monthly', 31, d('2026-03-05')),
+    ).toEqual(d('2026-03-31'));
   });
 
   it('결제일이 오늘이면 넘기지 않는다', () => {
-    expect(rollForward(d('2026-10-05'), 'monthly', 5, d('2026-10-05'))).toEqual(d('2026-10-05'));
+    expect(rollForward(d('2026-10-05'), 'monthly', 5, d('2026-10-05'))).toEqual(
+      d('2026-10-05'),
+    );
   });
 
   it('지나간 결제일을 모두 돌려준다 — 오늘 결제일은 아직 지나지 않은 것', () => {
-    expect(pastBillingDates(d('2026-08-21'), 'monthly', 21, d('2026-10-21'))).toEqual({
+    expect(
+      pastBillingDates(d('2026-08-21'), 'monthly', 21, d('2026-10-21')),
+    ).toEqual({
       past: [d('2026-08-21'), d('2026-09-21')],
       next: d('2026-10-21'),
     });
-    expect(pastBillingDates(d('2026-10-22'), 'monthly', 22, d('2026-10-21')).past).toEqual([]);
+    expect(
+      pastBillingDates(d('2026-10-22'), 'monthly', 22, d('2026-10-21')).past,
+    ).toEqual([]);
   });
 });

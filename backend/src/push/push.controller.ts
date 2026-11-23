@@ -29,7 +29,12 @@ export class PushController {
     @Req() req: Request,
     @Headers('user-agent') ua?: string,
   ) {
-    return this.service.subscribe(user.id, dto, ua, req.cookies?.[REFRESH_COOKIE] as string | undefined);
+    return this.service.subscribe(
+      user.id,
+      dto,
+      ua,
+      req.cookies?.[REFRESH_COOKIE] as string | undefined,
+    );
   }
 
   // 브라우저 푸시 구독 해제

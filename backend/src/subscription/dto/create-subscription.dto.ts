@@ -1,4 +1,8 @@
-import { SubscriptionCurrency, SubscriptionCycle, SubscriptionStatus } from '@prisma/client';
+import {
+  SubscriptionCurrency,
+  SubscriptionCycle,
+  SubscriptionStatus,
+} from '@prisma/client';
 import {
   IsBoolean,
   IsDateString,

@@ -9,5 +9,6 @@ export const DEMO_VAULT_PASSWORD = 'demo1234';
 
 // 데모에서는 다른 방문자를 방해하는 동작(계정 삭제 · 마스터 잠금 변경 등)을 막는다 — 운영에서는 아무 일도 하지 않는다
 export function assertNotDemo(action: string): void {
-  if (env.DEMO_MODE) throw new ForbiddenException(`데모에서는 ${action}할 수 없습니다.`);
+  if (env.DEMO_MODE)
+    throw new ForbiddenException(`데모에서는 ${action}할 수 없습니다.`);
 }

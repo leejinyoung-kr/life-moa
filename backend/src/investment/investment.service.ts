@@ -1,5 +1,14 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { Investment, InvestmentType, Prisma, RecurringSchedule } from '@prisma/client';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import {
+  Investment,
+  InvestmentType,
+  Prisma,
+  RecurringSchedule,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { parsePage } from '@leejinyoung-kr/core-common';
 import { RRule, periodOf, nthOccurrence } from '../transaction/recurring.util';
@@ -45,10 +54,14 @@ export class InvestmentService {
       principal,
       principalUsd: v.principal_usd ? v.principal_usd.toNumber() : null,
       currentValue,
-      currentValueUsd: v.current_value_usd ? v.current_value_usd.toNumber() : null,
+      currentValueUsd: v.current_value_usd
+        ? v.current_value_usd.toNumber()
+        : null,
       profit,
       profitRate: principal ? Math.round((profit / principal) * 1000) / 10 : 0,
-      purchaseDate: v.purchase_date ? v.purchase_date.toISOString().slice(0, 10) : null,
+      purchaseDate: v.purchase_date
+        ? v.purchase_date.toISOString().slice(0, 10)
+        : null,
       memo: v.memo,
       // 평가금액 최근 수정 시각 — 시세 API 연동 전까지는 수동 입력이라 신뢰도 가늠용으로 노출
       updatedAt: v.updated_at.toISOString(),
@@ -57,7 +70,10 @@ export class InvestmentService {
 
   // symbol 필수 확인 — 직접 단가 입력이 없을 때 시세조회에 필요
   private requireSymbol(row: Investment): string {
-    if (!row.symbol) throw new BadRequestException('종목코드/티커가 없는 종목은 단가를 직접 입력해야 합니다.');
+    if (!row.symbol)
+      throw new BadRequestException(
+        '종목코드/티커가 없는 종목은 단가를 직접 입력해야 합니다.',
+      );
     return row.symbol;
   }
 
@@ -67,12 +83,20 @@ export class InvestmentService {
     row: Investment,
     quantity: number,
     manualPrice?: number,
-  ): Promise<{ isForeign: boolean; amount: Prisma.Decimal; krwAmount: Prisma.Decimal }> {
+  ): Promise<{
+    isForeign: boolean;
+    amount: Prisma.Decimal;
+    krwAmount: Prisma.Decimal;
+  }> {
     const isForeign = FOREIGN_TYPES.includes(row.type);
     if (!isForeign) {
-      const price = manualPrice !== undefined
-        ? new Prisma.Decimal(manualPrice)
-        : new Prisma.Decimal((await this.priceLookup.lookup(row.type, this.requireSymbol(row))).krwPrice);
+      const price =
+        manualPrice !== undefined
+          ? new Prisma.Decimal(manualPrice)
+          : new Prisma.Decimal(
+              (await this.priceLookup.lookup(row.type, this.requireSymbol(row)))
+                .krwPrice,
+            );
       const amount = new Prisma.Decimal(quantity).mul(price);
       return { isForeign, amount, krwAmount: amount };
     }
@@ -80,9 +104,14 @@ export class InvestmentService {
     let unitKrw: Prisma.Decimal;
     if (manualPrice !== undefined) {
       unitNative = new Prisma.Decimal(manualPrice);
-      unitKrw = unitNative.mul(await this.priceLookup.getExchangeRate('USD', 'KRW'));
+      unitKrw = unitNative.mul(
+        await this.priceLookup.getExchangeRate('USD', 'KRW'),
+      );
     } else {
-      const r = await this.priceLookup.lookup(row.type, this.requireSymbol(row));
+      const r = await this.priceLookup.lookup(
+        row.type,
+        this.requireSymbol(row),
+      );
       unitNative = new Prisma.Decimal(r.price);
       unitKrw = new Prisma.Decimal(r.krwPrice);
     }
@@ -93,14 +122,22 @@ export class InvestmentService {
 
   // 활성 종목(symbol + quantity 보유)의 current_value 를 현재 시세로 갱신.
   // 수량 × 현재가(원화)로 재계산 — 외부 API 과다호출 방지를 위해 PRICE_REFRESH_BATCH_SIZE 개씩 배치 처리.
-  async refreshCurrentValues(userId: number, market?: 'domestic' | 'foreign'): Promise<void> {
+  async refreshCurrentValues(
+    userId: number,
+    market?: 'domestic' | 'foreign',
+  ): Promise<void> {
     const rows = await this.prisma.investment.findMany({
       where: {
         user_id: userId,
         deleted_at: null,
         symbol: { not: null },
         quantity: { not: null },
-        type: market === 'foreign' ? { in: FOREIGN_TYPES } : market === 'domestic' ? { notIn: FOREIGN_TYPES } : undefined,
+        type:
+          market === 'foreign'
+            ? { in: FOREIGN_TYPES }
+            : market === 'domestic'
+              ? { notIn: FOREIGN_TYPES }
+              : undefined,
       },
     });
     if (!rows.length) return;
@@ -108,29 +145,39 @@ export class InvestmentService {
     let updated = 0;
     for (let i = 0; i < rows.length; i += PRICE_REFRESH_BATCH_SIZE) {
       const batch = rows.slice(i, i + PRICE_REFRESH_BATCH_SIZE);
-      await Promise.all(batch.map(async (inv) => {
-        try {
-          const r = await this.priceLookup.lookup(inv.type, inv.symbol!);
-          const newValue = inv.quantity!.mul(new Prisma.Decimal(r.krwPrice));
-          const isForeign = FOREIGN_TYPES.includes(inv.type);
-          await this.prisma.investment.update({
-            where: { id: inv.id },
-            data: {
-              current_value: newValue,
-              current_value_usd: isForeign ? inv.quantity!.mul(new Prisma.Decimal(r.price)) : undefined,
-            },
-          });
-          updated++;
-        } catch (e) {
-          this.sysLog.warn({
-            userId,
-            category: 'asset',
-            message: `${inv.symbol} 현재가 갱신 실패`,
-            metadata: { investmentId: inv.id, symbol: inv.symbol, type: inv.type, error: (e as Error).message },
-          });
-        }
-      }));
-      if (i + PRICE_REFRESH_BATCH_SIZE < rows.length) await sleep(PRICE_REFRESH_BATCH_DELAY_MS);
+      await Promise.all(
+        batch.map(async (inv) => {
+          try {
+            const r = await this.priceLookup.lookup(inv.type, inv.symbol!);
+            const newValue = inv.quantity!.mul(new Prisma.Decimal(r.krwPrice));
+            const isForeign = FOREIGN_TYPES.includes(inv.type);
+            await this.prisma.investment.update({
+              where: { id: inv.id },
+              data: {
+                current_value: newValue,
+                current_value_usd: isForeign
+                  ? inv.quantity!.mul(new Prisma.Decimal(r.price))
+                  : undefined,
+              },
+            });
+            updated++;
+          } catch (e) {
+            this.sysLog.warn({
+              userId,
+              category: 'asset',
+              message: `${inv.symbol} 현재가 갱신 실패`,
+              metadata: {
+                investmentId: inv.id,
+                symbol: inv.symbol,
+                type: inv.type,
+                error: (e as Error).message,
+              },
+            });
+          }
+        }),
+      );
+      if (i + PRICE_REFRESH_BATCH_SIZE < rows.length)
+        await sleep(PRICE_REFRESH_BATCH_DELAY_MS);
     }
 
     if (updated > 0) {
@@ -150,7 +197,10 @@ export class InvestmentService {
   // 전날 종가로 굳어있는 가격에 매수하게 되므로 시간을 분리해야 한다.
   // 종목별로 외부 시세조회 API(네이버/야후)를 호출하므로, 한꺼번에 몰아치지 않도록 RECURRING_BUY_BATCH_SIZE개씩 묶어
   // RECURRING_BUY_BATCH_DELAY_MS만큼 쉬어가며 처리한다.
-  async materializeRecurringBuys(userId: number, market?: 'domestic' | 'foreign'): Promise<number> {
+  async materializeRecurringBuys(
+    userId: number,
+    market?: 'domestic' | 'foreign',
+  ): Promise<number> {
     const schedules = await this.prisma.recurringSchedule.findMany({
       where: {
         user_id: userId,
@@ -159,7 +209,12 @@ export class InvestmentService {
         active: true,
         investment: {
           deleted_at: null,
-          type: market === 'foreign' ? { in: FOREIGN_TYPES } : market === 'domestic' ? { notIn: FOREIGN_TYPES } : undefined,
+          type:
+            market === 'foreign'
+              ? { in: FOREIGN_TYPES }
+              : market === 'domestic'
+                ? { notIn: FOREIGN_TYPES }
+                : undefined,
         },
       },
       include: { investment: true },
@@ -169,8 +224,11 @@ export class InvestmentService {
 
     for (let i = 0; i < schedules.length; i += RECURRING_BUY_BATCH_SIZE) {
       const batch = schedules.slice(i, i + RECURRING_BUY_BATCH_SIZE);
-      await Promise.all(batch.map((s) => this.materializeOneRecurringBuy(userId, s, now)));
-      if (i + RECURRING_BUY_BATCH_SIZE < schedules.length) await sleep(RECURRING_BUY_BATCH_DELAY_MS);
+      await Promise.all(
+        batch.map((s) => this.materializeOneRecurringBuy(userId, s, now)),
+      );
+      if (i + RECURRING_BUY_BATCH_SIZE < schedules.length)
+        await sleep(RECURRING_BUY_BATCH_DELAY_MS);
     }
     return schedules.length;
   }
@@ -184,13 +242,19 @@ export class InvestmentService {
     const inv = schedule.investment;
     if (!inv || inv.deleted_at) return;
     const rule = schedule.rule as unknown as RRule | null;
-    if (!rule?.cycle || (!schedule.buy_amount && !schedule.buy_quantity) || !inv.symbol) return;
+    if (
+      !rule?.cycle ||
+      (!schedule.buy_amount && !schedule.buy_quantity) ||
+      !inv.symbol
+    )
+      return;
     const isForeign = FOREIGN_TYPES.includes(inv.type);
 
     let lastPeriod = schedule.last_period;
     let quantity = inv.quantity;
 
-    for (let i = 0; i <= 120; i++) { // 안전 상한 — 10년치 월간 회차
+    for (let i = 0; i <= 120; i++) {
+      // 안전 상한 — 10년치 월간 회차
       const occ = nthOccurrence(schedule.start_date, rule, i);
       if (occ > now) break;
       if (occ < schedule.start_date) continue; // 시작일 이전 회차(연간 i=0이 시작월보다 이른 달인 경우)는 매수하지 않음
@@ -208,7 +272,13 @@ export class InvestmentService {
           userId,
           category: 'recurring_buy',
           message: `${inv.symbol} 시세 조회 실패 — 다음 배치에 재시도`,
-          metadata: { investmentId: inv.id, symbol: inv.symbol, type: inv.type, period, error: (e as Error).message },
+          metadata: {
+            investmentId: inv.id,
+            symbol: inv.symbol,
+            type: inv.type,
+            period,
+            error: (e as Error).message,
+          },
         });
         break;
       }
@@ -216,7 +286,9 @@ export class InvestmentService {
       const qtyDelta = schedule.buy_quantity
         ? schedule.buy_quantity
         : schedule.buy_amount!.div(unitNative);
-      const nativeAmount = schedule.buy_quantity ? qtyDelta.mul(unitNative) : schedule.buy_amount!;
+      const nativeAmount = schedule.buy_quantity
+        ? qtyDelta.mul(unitNative)
+        : schedule.buy_amount!;
       const krwAmount = qtyDelta.mul(unitKrw);
 
       let applied: boolean;
@@ -226,23 +298,34 @@ export class InvestmentService {
             where: { id: inv.account_id, user_id: userId, deleted_at: null },
           });
           if (!account) return false;
-          const balance = isForeign ? account.cash_balance_usd : account.cash_balance;
+          const balance = isForeign
+            ? account.cash_balance_usd
+            : account.cash_balance;
           if (balance.lessThan(nativeAmount)) return false;
           await tx.investmentAccount.update({
             where: { id: account.id },
-            data: isForeign ? { cash_balance_usd: { decrement: nativeAmount } } : { cash_balance: { decrement: nativeAmount } },
+            data: isForeign
+              ? { cash_balance_usd: { decrement: nativeAmount } }
+              : { cash_balance: { decrement: nativeAmount } },
           });
           await tx.investment.update({
             where: { id: inv.id },
             data: {
               principal: { increment: krwAmount },
-              ...(isForeign ? { principal_usd: { increment: nativeAmount } } : {}),
+              ...(isForeign
+                ? { principal_usd: { increment: nativeAmount } }
+                : {}),
               current_value: { increment: krwAmount },
-              ...(isForeign ? { current_value_usd: { increment: nativeAmount } } : {}),
+              ...(isForeign
+                ? { current_value_usd: { increment: nativeAmount } }
+                : {}),
               quantity: quantity ? { increment: qtyDelta } : qtyDelta,
             },
           });
-          await tx.recurringSchedule.update({ where: { id: schedule.id }, data: { last_period: period } });
+          await tx.recurringSchedule.update({
+            where: { id: schedule.id },
+            data: { last_period: period },
+          });
           return true;
         });
       } catch (e) {
@@ -250,7 +333,13 @@ export class InvestmentService {
           userId,
           category: 'recurring_buy',
           message: `${inv.symbol} 반복매수 DB 처리 충돌 — 다음 배치에 재시도`,
-          metadata: { investmentId: inv.id, symbol: inv.symbol, type: inv.type, period, error: (e as Error).message },
+          metadata: {
+            investmentId: inv.id,
+            symbol: inv.symbol,
+            type: inv.type,
+            period,
+            error: (e as Error).message,
+          },
         });
         break;
       }
@@ -259,7 +348,14 @@ export class InvestmentService {
           userId,
           category: 'recurring_buy',
           message: `${inv.symbol} 반복매수 예수금 부족 — 충전 후 재시도`,
-          metadata: { investmentId: inv.id, symbol: inv.symbol, type: inv.type, period, required: nativeAmount.toFixed(4), currency: isForeign ? 'USD' : 'KRW' },
+          metadata: {
+            investmentId: inv.id,
+            symbol: inv.symbol,
+            type: inv.type,
+            period,
+            required: nativeAmount.toFixed(4),
+            currency: isForeign ? 'USD' : 'KRW',
+          },
         });
         break;
       }
@@ -267,7 +363,14 @@ export class InvestmentService {
         userId,
         category: 'recurring_buy',
         message: `${inv.symbol} 반복매수 ${period} 회차 처리 완료`,
-        metadata: { investmentId: inv.id, symbol: inv.symbol, type: inv.type, period, quantity: qtyDelta.toFixed(6), amountKrw: krwAmount.toFixed(0) },
+        metadata: {
+          investmentId: inv.id,
+          symbol: inv.symbol,
+          type: inv.type,
+          period,
+          quantity: qtyDelta.toFixed(6),
+          amountKrw: krwAmount.toFixed(0),
+        },
       });
       lastPeriod = period;
       quantity = quantity ? quantity.add(qtyDelta) : qtyDelta;
@@ -279,25 +382,41 @@ export class InvestmentService {
     const account = await this.prisma.investmentAccount.findFirst({
       where: { id: accountId, user_id: userId, deleted_at: null },
     });
-    if (!account) throw new BadRequestException('소속 투자 계좌를 찾을 수 없습니다.');
+    if (!account)
+      throw new BadRequestException('소속 투자 계좌를 찾을 수 없습니다.');
     return account;
   }
 
   // 투자 목록 — 유형/종목명/계좌 필터. page 지정 시 서버 페이징, 없으면 전체 배열
   async findAll(userId: number, query: QueryInvestmentDto = {}) {
-    const where: Prisma.InvestmentWhereInput = { user_id: userId, deleted_at: null };
+    const where: Prisma.InvestmentWhereInput = {
+      user_id: userId,
+      deleted_at: null,
+    };
     if (query.type) where.type = query.type;
     if (query.q) where.name = { contains: query.q };
     if (query.accountId) where.account_id = Number(query.accountId);
-    const orderBy: Prisma.InvestmentOrderByWithRelationInput = { created_at: 'desc' };
+    const orderBy: Prisma.InvestmentOrderByWithRelationInput = {
+      created_at: 'desc',
+    };
 
     const pg = parsePage(query.page, query.limit);
     if (pg) {
       const [rows, total] = await this.prisma.$transaction([
-        this.prisma.investment.findMany({ where, orderBy, skip: pg.skip, take: pg.take }),
+        this.prisma.investment.findMany({
+          where,
+          orderBy,
+          skip: pg.skip,
+          take: pg.take,
+        }),
         this.prisma.investment.count({ where }),
       ]);
-      return { items: rows.map((r) => this.toDto(r)), total, page: pg.page, limit: pg.limit };
+      return {
+        items: rows.map((r) => this.toDto(r)),
+        total,
+        page: pg.page,
+        limit: pg.limit,
+      };
     }
 
     const rows = await this.prisma.investment.findMany({ where, orderBy });
@@ -322,14 +441,19 @@ export class InvestmentService {
       totalValue,
       totalPrincipal,
       totalProfit,
-      profitRate: totalPrincipal ? Math.round((totalProfit / totalPrincipal) * 1000) / 10 : 0,
+      profitRate: totalPrincipal
+        ? Math.round((totalProfit / totalPrincipal) * 1000) / 10
+        : 0,
     };
   }
 
   // 반복매수 활성화 시 시세조회/회차계산에 필요한 값(종목코드·회차금액·규칙·최초매수일)이 모두 있는지 확인
   // 투자원금/평가금액 입력값 → 원화 환산 — 해외종목(foreign_stock/foreign_etf)은 폼에서 달러로 입력받으므로
   // 실시간 환율로 원화 변환해 저장(principal/current_value는 항상 원화 기준으로 전체 자산 집계와 맞춤)
-  private async toKrwAmount(type: InvestmentType, value: number): Promise<Prisma.Decimal> {
+  private async toKrwAmount(
+    type: InvestmentType,
+    value: number,
+  ): Promise<Prisma.Decimal> {
     if (!FOREIGN_TYPES.includes(type)) return new Prisma.Decimal(value);
     const rate = await this.priceLookup.getExchangeRate('USD', 'KRW');
     return new Prisma.Decimal(value).mul(rate);
@@ -349,11 +473,18 @@ export class InvestmentService {
         name: dto.name,
         type: dto.type,
         symbol: dto.symbol,
-        quantity: dto.quantity !== undefined ? new Prisma.Decimal(dto.quantity) : undefined,
+        quantity:
+          dto.quantity !== undefined
+            ? new Prisma.Decimal(dto.quantity)
+            : undefined,
         principal,
-        principal_usd: FOREIGN_TYPES.includes(dto.type) ? new Prisma.Decimal(dto.principal) : null,
+        principal_usd: FOREIGN_TYPES.includes(dto.type)
+          ? new Prisma.Decimal(dto.principal)
+          : null,
         current_value: currentValue,
-        current_value_usd: FOREIGN_TYPES.includes(dto.type) ? new Prisma.Decimal(dto.currentValue) : null,
+        current_value_usd: FOREIGN_TYPES.includes(dto.type)
+          ? new Prisma.Decimal(dto.currentValue)
+          : null,
         purchase_date: dto.purchaseDate ? new Date(dto.purchaseDate) : null,
         memo: dto.memo,
       },
@@ -373,11 +504,16 @@ export class InvestmentService {
   // 투자 수정
   async update(userId: number, id: number, dto: UpdateInvestmentDto) {
     const existing = await this.findOwned(userId, id);
-    if (dto.accountId !== undefined) await this.findOwnedAccount(userId, dto.accountId);
+    if (dto.accountId !== undefined)
+      await this.findOwnedAccount(userId, dto.accountId);
     const type = dto.type ?? existing.type;
     const [principal, currentValue] = await Promise.all([
-      dto.principal !== undefined ? this.toKrwAmount(type, dto.principal) : undefined,
-      dto.currentValue !== undefined ? this.toKrwAmount(type, dto.currentValue) : undefined,
+      dto.principal !== undefined
+        ? this.toKrwAmount(type, dto.principal)
+        : undefined,
+      dto.currentValue !== undefined
+        ? this.toKrwAmount(type, dto.currentValue)
+        : undefined,
     ]);
     const updated = await this.prisma.investment.update({
       where: { id },
@@ -386,16 +522,23 @@ export class InvestmentService {
         name: dto.name,
         type: dto.type,
         symbol: dto.symbol,
-        quantity: dto.quantity !== undefined ? new Prisma.Decimal(dto.quantity) : undefined,
+        quantity:
+          dto.quantity !== undefined
+            ? new Prisma.Decimal(dto.quantity)
+            : undefined,
         principal,
-        principal_usd: dto.principal !== undefined && FOREIGN_TYPES.includes(type)
-          ? new Prisma.Decimal(dto.principal)
-          : undefined,
+        principal_usd:
+          dto.principal !== undefined && FOREIGN_TYPES.includes(type)
+            ? new Prisma.Decimal(dto.principal)
+            : undefined,
         current_value: currentValue,
-        current_value_usd: dto.currentValue !== undefined && FOREIGN_TYPES.includes(type)
-          ? new Prisma.Decimal(dto.currentValue)
+        current_value_usd:
+          dto.currentValue !== undefined && FOREIGN_TYPES.includes(type)
+            ? new Prisma.Decimal(dto.currentValue)
+            : undefined,
+        purchase_date: dto.purchaseDate
+          ? new Date(dto.purchaseDate)
           : undefined,
-        purchase_date: dto.purchaseDate ? new Date(dto.purchaseDate) : undefined,
         memo: dto.memo,
       },
     });
@@ -405,17 +548,26 @@ export class InvestmentService {
   // 시세조회 — 등록된 symbol(종목코드/티커)로 현재가 조회 후 저장된 quantity(보유수량)와 곱해 평가금액 산출
   async lookupPrice(userId: number, id: number) {
     const row = await this.findOwned(userId, id);
-    if (!row.symbol) throw new BadRequestException('종목코드/티커가 등록되지 않았습니다.');
-    if (!row.quantity) throw new BadRequestException('보유수량이 등록되지 않았습니다. 수정에서 입력해주세요.');
+    if (!row.symbol)
+      throw new BadRequestException('종목코드/티커가 등록되지 않았습니다.');
+    if (!row.quantity)
+      throw new BadRequestException(
+        '보유수량이 등록되지 않았습니다. 수정에서 입력해주세요.',
+      );
     const result = await this.priceLookup.lookup(row.type, row.symbol);
     const quantity = row.quantity.toNumber();
-    return { ...result, quantity, evaluatedValue: Math.round(result.krwPrice * quantity) };
+    return {
+      ...result,
+      quantity,
+      evaluatedValue: Math.round(result.krwPrice * quantity),
+    };
   }
 
   // 시세조회(단가만) — 매수/매도 모달에서 보유수량과 무관하게 현재 단가만 필요할 때 사용
   async quote(userId: number, id: number) {
     const row = await this.findOwned(userId, id);
-    if (!row.symbol) throw new BadRequestException('종목코드/티커가 등록되지 않았습니다.');
+    if (!row.symbol)
+      throw new BadRequestException('종목코드/티커가 등록되지 않았습니다.');
     return this.priceLookup.lookup(row.type, row.symbol);
   }
 
@@ -423,19 +575,30 @@ export class InvestmentService {
   // 해외종목은 단가를 달러로 다루며 cash_balance_usd에서 차감, principal/current_value는 원화 환산값(krwAmount)으로 누적
   async buy(userId: number, id: number, dto: TradeInvestmentDto) {
     const row = await this.findOwned(userId, id);
-    const { isForeign, amount, krwAmount } = await this.resolveTradeAmount(row, dto.quantity, dto.price);
+    const { isForeign, amount, krwAmount } = await this.resolveTradeAmount(
+      row,
+      dto.quantity,
+      dto.price,
+    );
     return this.prisma.$transaction(async (tx) => {
       const account = await tx.investmentAccount.findFirst({
         where: { id: row.account_id, user_id: userId, deleted_at: null },
       });
-      if (!account) throw new BadRequestException('소속 투자 계좌를 찾을 수 없습니다.');
-      const balance = isForeign ? account.cash_balance_usd : account.cash_balance;
+      if (!account)
+        throw new BadRequestException('소속 투자 계좌를 찾을 수 없습니다.');
+      const balance = isForeign
+        ? account.cash_balance_usd
+        : account.cash_balance;
       if (balance.lessThan(amount)) {
-        throw new BadRequestException(isForeign ? '달러 예수금이 부족합니다.' : '예수금이 부족합니다.');
+        throw new BadRequestException(
+          isForeign ? '달러 예수금이 부족합니다.' : '예수금이 부족합니다.',
+        );
       }
       await tx.investmentAccount.update({
         where: { id: account.id },
-        data: isForeign ? { cash_balance_usd: { decrement: amount } } : { cash_balance: { decrement: amount } },
+        data: isForeign
+          ? { cash_balance_usd: { decrement: amount } }
+          : { cash_balance: { decrement: amount } },
       });
       const updated = await tx.investment.update({
         where: { id },
@@ -444,7 +607,9 @@ export class InvestmentService {
           ...(isForeign ? { principal_usd: { increment: amount } } : {}),
           current_value: { increment: krwAmount },
           ...(isForeign ? { current_value_usd: { increment: amount } } : {}),
-          quantity: row.quantity ? { increment: dto.quantity } : new Prisma.Decimal(dto.quantity),
+          quantity: row.quantity
+            ? { increment: dto.quantity }
+            : new Prisma.Decimal(dto.quantity),
         },
       });
       return this.toDto(updated);
@@ -459,17 +624,26 @@ export class InvestmentService {
     if (!row.quantity || row.quantity.lessThan(dto.quantity)) {
       throw new BadRequestException('보유수량이 부족합니다.');
     }
-    const { isForeign, amount, krwAmount } = await this.resolveTradeAmount(row, dto.quantity, dto.price);
+    const { isForeign, amount, krwAmount } = await this.resolveTradeAmount(
+      row,
+      dto.quantity,
+      dto.price,
+    );
     const newCurrentValue = row.current_value.greaterThan(krwAmount)
       ? row.current_value.sub(krwAmount)
       : new Prisma.Decimal(0);
-    const newCurrentValueUsd = isForeign && row.current_value_usd
-      ? (row.current_value_usd.greaterThan(amount) ? row.current_value_usd.sub(amount) : new Prisma.Decimal(0))
-      : undefined;
+    const newCurrentValueUsd =
+      isForeign && row.current_value_usd
+        ? row.current_value_usd.greaterThan(amount)
+          ? row.current_value_usd.sub(amount)
+          : new Prisma.Decimal(0)
+        : undefined;
     // 남는 비율 = (보유 − 매도) / 보유. 전량 매도면 원금 0
     const keep = row.quantity.sub(dto.quantity).div(row.quantity);
     const newPrincipal = row.principal.mul(keep).toDecimalPlaces(0);
-    const newPrincipalUsd = row.principal_usd ? row.principal_usd.mul(keep).toDecimalPlaces(4) : undefined;
+    const newPrincipalUsd = row.principal_usd
+      ? row.principal_usd.mul(keep).toDecimalPlaces(4)
+      : undefined;
     return this.prisma.$transaction(async (tx) => {
       const updated = await tx.investment.update({
         where: { id },
@@ -483,7 +657,9 @@ export class InvestmentService {
       });
       await tx.investmentAccount.update({
         where: { id: row.account_id },
-        data: isForeign ? { cash_balance_usd: { increment: amount } } : { cash_balance: { increment: amount } },
+        data: isForeign
+          ? { cash_balance_usd: { increment: amount } }
+          : { cash_balance: { increment: amount } },
       });
       return this.toDto(updated);
     });

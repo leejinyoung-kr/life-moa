@@ -1,5 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma, Subscription, SubscriptionCurrency, SubscriptionCycle } from '@prisma/client';
+import {
+  Prisma,
+  Subscription,
+  SubscriptionCurrency,
+  SubscriptionCycle,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { PriceLookupService } from '../investment/price-lookup.service';
 import { parsePage } from '@leejinyoung-kr/core-common';
@@ -15,7 +20,12 @@ function toDateStr(d: Date | null): string | null {
 }
 
 // 주기별 청구액을 월 기준으로 환산 (연→/12, 주→*52/12). USD면 rate로 원화 환산 후 계산
-function toMonthly(amount: number, cycle: SubscriptionCycle, currency: SubscriptionCurrency, usdToKrwRate: number): number {
+function toMonthly(
+  amount: number,
+  cycle: SubscriptionCycle,
+  currency: SubscriptionCurrency,
+  usdToKrwRate: number,
+): number {
   const krwAmount = currency === 'USD' ? amount * usdToKrwRate : amount;
   if (cycle === 'yearly') return krwAmount / 12;
   if (cycle === 'weekly') return (krwAmount * 52) / 12;
@@ -50,22 +60,37 @@ export class SubscriptionService {
   // 구독 목록 (해지=soft delete 제외) — 서비스명/카테고리 검색.
   // page 지정 시 서버 페이징, 없으면 전체 배열.
   async findAll(userId: number, query: QuerySubscriptionDto = {}) {
-    const where: Prisma.SubscriptionWhereInput = { user_id: userId, deleted_at: null };
+    const where: Prisma.SubscriptionWhereInput = {
+      user_id: userId,
+      deleted_at: null,
+    };
     if (query.q) {
       where.OR = [
         { name: { contains: query.q } },
         { category: { contains: query.q } },
       ];
     }
-    const orderBy: Prisma.SubscriptionOrderByWithRelationInput = { created_at: 'desc' };
+    const orderBy: Prisma.SubscriptionOrderByWithRelationInput = {
+      created_at: 'desc',
+    };
 
     const pg = parsePage(query.page, query.limit);
     if (pg) {
       const [rows, total] = await this.prisma.$transaction([
-        this.prisma.subscription.findMany({ where, orderBy, skip: pg.skip, take: pg.take }),
+        this.prisma.subscription.findMany({
+          where,
+          orderBy,
+          skip: pg.skip,
+          take: pg.take,
+        }),
         this.prisma.subscription.count({ where }),
       ]);
-      return { items: rows.map((r) => this.toDto(r)), total, page: pg.page, limit: pg.limit };
+      return {
+        items: rows.map((r) => this.toDto(r)),
+        total,
+        page: pg.page,
+        limit: pg.limit,
+      };
     }
 
     const rows = await this.prisma.subscription.findMany({ where, orderBy });
@@ -83,19 +108,31 @@ export class SubscriptionService {
 
     // USD 구독이 하나라도 있을 때만 환율 조회 (행마다 호출하지 않고 1회만 재사용)
     const hasUsd = billing.some((r) => r.currency === 'USD');
-    const usdToKrwRate = hasUsd ? await this.priceLookup.getExchangeRate('USD', 'KRW') : 1;
+    const usdToKrwRate = hasUsd
+      ? await this.priceLookup.getExchangeRate('USD', 'KRW')
+      : 1;
 
     const monthlyTotal = Math.round(
-      billing.reduce((sum, r) => sum + toMonthly(r.amount.toNumber(), r.cycle, r.currency, usdToKrwRate), 0),
+      billing.reduce(
+        (sum, r) =>
+          sum +
+          toMonthly(r.amount.toNumber(), r.cycle, r.currency, usdToKrwRate),
+        0,
+      ),
     );
 
     // 다음 결제 임박 — 오늘(KST) 이후 가장 가까운 결제일
     const today = todayKst();
     const upcoming = billing
       .filter((r) => r.next_payment_date >= today)
-      .sort((a, b) => a.next_payment_date.getTime() - b.next_payment_date.getTime())[0];
+      .sort(
+        (a, b) => a.next_payment_date.getTime() - b.next_payment_date.getTime(),
+      )[0];
     const nextDays = upcoming
-      ? Math.ceil((upcoming.next_payment_date.getTime() - today.getTime()) / (24 * 60 * 60 * 1000))
+      ? Math.ceil(
+          (upcoming.next_payment_date.getTime() - today.getTime()) /
+            (24 * 60 * 60 * 1000),
+        )
       : null;
 
     // 체험 종료 임박 배너용 — 첫 체험 구독 (목록이 페이징되어도 배너가 동작하도록 요약에 동봉)
@@ -155,19 +192,33 @@ export class SubscriptionService {
   // 일시정지를 풀 때 결제일이 지나 있으면 오늘 이후 첫 결제일로 넘긴다 — 쉬는 동안의 결제일이 가계부에 자동 등록되지 않게
   async update(userId: number, id: number, dto: UpdateSubscriptionDto) {
     const current = await this.findOwned(userId, id);
-    let nextDate = dto.nextPaymentDate ? new Date(dto.nextPaymentDate) : undefined;
-    const dateChanged = nextDate !== undefined && nextDate.getTime() !== current.next_payment_date.getTime();
-    const billingDay = nextDate && dateChanged ? nextDate.getUTCDate() : current.billing_day;
-    const resumed = current.status === 'paused' && dto.status !== undefined && dto.status !== 'paused';
+    let nextDate = dto.nextPaymentDate
+      ? new Date(dto.nextPaymentDate)
+      : undefined;
+    const dateChanged =
+      nextDate !== undefined &&
+      nextDate.getTime() !== current.next_payment_date.getTime();
+    const billingDay =
+      nextDate && dateChanged ? nextDate.getUTCDate() : current.billing_day;
+    const resumed =
+      current.status === 'paused' &&
+      dto.status !== undefined &&
+      dto.status !== 'paused';
     if (resumed) {
-      nextDate = rollForward(nextDate ?? current.next_payment_date, dto.cycle ?? current.cycle, billingDay, todayKst());
+      nextDate = rollForward(
+        nextDate ?? current.next_payment_date,
+        dto.cycle ?? current.cycle,
+        billingDay,
+        todayKst(),
+      );
     }
     const updated = await this.prisma.subscription.update({
       where: { id },
       data: {
         name: dto.name,
         category: dto.category,
-        amount: dto.amount !== undefined ? new Prisma.Decimal(dto.amount) : undefined,
+        amount:
+          dto.amount !== undefined ? new Prisma.Decimal(dto.amount) : undefined,
         currency: dto.currency,
         cycle: dto.cycle,
         status: dto.status,

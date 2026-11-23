@@ -54,15 +54,40 @@ const EMAIL_CODE_HOURLY_MAX = 5;
 const EMAIL_CODE_DAILY_MAX = 10;
 const HOUR_MS = 60 * 60 * 1000;
 // 검증 실패 공통 문구 — 허용 여부·코드 유무·만료·횟수 초과를 구분하지 않아 허용 이메일 열거를 막는다
-const EMAIL_CODE_INVALID = '인증코드가 올바르지 않거나 만료되었습니다. 다시 요청하세요.';
+const EMAIL_CODE_INVALID =
+  '인증코드가 올바르지 않거나 만료되었습니다. 다시 요청하세요.';
 
 // User-Agent → 기기 표기/종류 추정 (간이)
-function parseDevice(ua = ''): { device: string; type: 'desktop' | 'mobile' | 'unknown' } {
+function parseDevice(ua = ''): {
+  device: string;
+  type: 'desktop' | 'mobile' | 'unknown';
+} {
   if (!ua) return { device: '알 수 없는 기기', type: 'unknown' };
   const mobile = /Mobile|Android|iPhone|iPad/i.test(ua);
-  const browser = /Edg/i.test(ua) ? 'Edge' : /Chrome/i.test(ua) ? 'Chrome' : /Firefox/i.test(ua) ? 'Firefox' : /Safari/i.test(ua) ? 'Safari' : 'Unknown';
-  const os = /Windows/i.test(ua) ? 'Windows' : /Mac OS/i.test(ua) ? 'macOS' : /Android/i.test(ua) ? 'Android' : /iPhone|iPad/i.test(ua) ? 'iOS' : /Linux/i.test(ua) ? 'Linux' : '';
-  return { device: `${os ? os + ' · ' : ''}${browser}`, type: mobile ? 'mobile' : 'desktop' };
+  const browser = /Edg/i.test(ua)
+    ? 'Edge'
+    : /Chrome/i.test(ua)
+      ? 'Chrome'
+      : /Firefox/i.test(ua)
+        ? 'Firefox'
+        : /Safari/i.test(ua)
+          ? 'Safari'
+          : 'Unknown';
+  const os = /Windows/i.test(ua)
+    ? 'Windows'
+    : /Mac OS/i.test(ua)
+      ? 'macOS'
+      : /Android/i.test(ua)
+        ? 'Android'
+        : /iPhone|iPad/i.test(ua)
+          ? 'iOS'
+          : /Linux/i.test(ua)
+            ? 'Linux'
+            : '';
+  return {
+    device: `${os ? os + ' · ' : ''}${browser}`,
+    type: mobile ? 'mobile' : 'desktop',
+  };
 }
 
 @Injectable()
@@ -107,7 +132,11 @@ export class AuthService {
 
   // 갱신 토큰 — sub + jti(화이트리스트 식별자), httpOnly 쿠키로만 사용. refresh 전용 시크릿으로 서명
   // ttl은 SESSION_EXPIRY_MAP의 값(jsonwebtoken이 받는 시간 문자열) 또는 남은 초(숫자)만 들어오므로 캐스팅이 안전함
-  private signRefresh(userId: number, jti: string, ttl: string | number): string {
+  private signRefresh(
+    userId: number,
+    jti: string,
+    ttl: string | number,
+  ): string {
     return this.jwtService.sign(
       { sub: userId, jti, type: 'refresh' },
       { secret: this.refreshSecret, expiresIn: ttl as never },
@@ -127,16 +156,23 @@ export class AuthService {
   }
 
   // 사용자의 세션 자동 만료 설정(session_expiry) 조회 — 미설정 시 기본 7일
-  private async sessionExpiryOf(userId: number): Promise<{ jwt: string; ms: number }> {
+  private async sessionExpiryOf(
+    userId: number,
+  ): Promise<{ jwt: string; ms: number }> {
     const settings = await this.prisma.userSettings.findUnique({
       where: { user_id: userId },
       select: { session_expiry: true },
     });
-    return SESSION_EXPIRY_MAP[settings?.session_expiry ?? ''] ?? DEFAULT_SESSION_EXPIRY;
+    return (
+      SESSION_EXPIRY_MAP[settings?.session_expiry ?? ''] ??
+      DEFAULT_SESSION_EXPIRY
+    );
   }
 
   // 데모 로그인 — 데모 고정 사용자로 세션 발급. DEMO_MODE 인스턴스에서만 컨트롤러가 등록된다(DemoAuthController)
-  async demoLogin(client?: LoginClient): Promise<{ access: string; refresh: string; refreshTtlMs: number }> {
+  async demoLogin(
+    client?: LoginClient,
+  ): Promise<{ access: string; refresh: string; refreshTtlMs: number }> {
     const user = await this.prisma.user.upsert({
       where: { email: DEMO_EMAIL },
       update: {},
@@ -146,7 +182,9 @@ export class AuthService {
   }
 
   // 로컬 개발용 자동 로그인 — 고정 유저를 upsert 후 토큰 발급. NODE_ENV 가드는 컨트롤러에서 처리
-  async devLogin(client?: LoginClient): Promise<{ access: string; refresh: string; refreshTtlMs: number }> {
+  async devLogin(
+    client?: LoginClient,
+  ): Promise<{ access: string; refresh: string; refreshTtlMs: number }> {
     const email = 'dev@local';
     const user = await this.prisma.user.upsert({
       where: { email },
@@ -157,7 +195,10 @@ export class AuthService {
   }
 
   // Google 로그인 시 user upsert 후 access/refresh 토큰 발급. 클라이언트 정보가 있으면 세션 기록·신규 기기 감지
-  async login(googleUser: GoogleUser, client?: LoginClient): Promise<{ access: string; refresh: string; refreshTtlMs: number }> {
+  async login(
+    googleUser: GoogleUser,
+    client?: LoginClient,
+  ): Promise<{ access: string; refresh: string; refreshTtlMs: number }> {
     const user = await this.prisma.user.upsert({
       where: { google_id: googleUser.googleId },
       update: {
@@ -177,25 +218,39 @@ export class AuthService {
   }
 
   // access/refresh 발급 공통 로직 — 세션 기록 후 refresh 화이트리스트에 jti 등록. 구글·이메일 로그인 공유
-  private async issueTokens(user: User, client?: LoginClient): Promise<{ access: string; refresh: string; refreshTtlMs: number }> {
+  private async issueTokens(
+    user: User,
+    client?: LoginClient,
+  ): Promise<{ access: string; refresh: string; refreshTtlMs: number }> {
     const sessionId = client ? await this.recordLogin(user.id, client) : null;
     const jti = randomUUID();
     const { jwt: ttl, ms } = await this.sessionExpiryOf(user.id);
     await this.prisma.refreshToken.create({
-      data: { user_id: user.id, session_id: sessionId, jti, expires_at: new Date(Date.now() + ms) },
+      data: {
+        user_id: user.id,
+        session_id: sessionId,
+        jti,
+        expires_at: new Date(Date.now() + ms),
+      },
     });
-    return { access: this.signAccess(user), refresh: this.signRefresh(user.id, jti, ttl), refreshTtlMs: ms };
+    return {
+      access: this.signAccess(user),
+      refresh: this.signRefresh(user.id, jti, ttl),
+      refreshTtlMs: ms,
+    };
   }
 
   // 이메일 코드 발송 — 화이트리스트 통과 + 발급 상한 이내일 때 6자리 코드를 메일로 보낸다.
   // 이메일 허용 여부·상한 초과를 응답으로 노출하지 않음(열거 공격 차단) — 항상 동일 결과, 메일 발송은 기다리지 않는다
-  async requestEmailCode(rawEmail: string, client?: LoginClient): Promise<{ ok: true }> {
+  async requestEmailCode(rawEmail: string): Promise<{ ok: true }> {
     const email = rawEmail.trim().toLowerCase();
 
     // 허용 이메일만 실제 발송. 그 외엔 조용히 무시(응답은 동일)
     if (this.isEmailAllowed(email) && this.mail.isEnabled) {
       if (await this.emailCodeQuotaExceeded(email)) {
-        this.logger.warn(`이메일 코드 발급 상한 초과 — 발송 생략 (to=${email})`);
+        this.logger.warn(
+          `이메일 코드 발급 상한 초과 — 발송 생략 (to=${email})`,
+        );
         return { ok: true };
       }
       const code = randomInt(0, 1_000_000).toString().padStart(6, '0');
@@ -217,7 +272,9 @@ export class AuthService {
         .then((sent) => {
           if (!sent) this.logger.warn(`이메일 코드 발송 실패 (to=${email})`);
         })
-        .catch((e: unknown) => this.logger.warn(`이메일 코드 발송 오류 (to=${email}): ${String(e)}`));
+        .catch((e: unknown) =>
+          this.logger.warn(`이메일 코드 발송 오류 (to=${email}): ${String(e)}`),
+        );
     } else if (!this.mail.isEnabled) {
       this.logger.warn('SMTP 비활성 — 이메일 코드 발송 불가');
     }
@@ -229,8 +286,12 @@ export class AuthService {
   private async emailCodeQuotaExceeded(email: string): Promise<boolean> {
     const now = Date.now();
     const [hourly, daily] = await Promise.all([
-      this.prisma.emailLoginCode.count({ where: { email, created_at: { gte: new Date(now - HOUR_MS) } } }),
-      this.prisma.emailLoginCode.count({ where: { email, created_at: { gte: new Date(now - 24 * HOUR_MS) } } }),
+      this.prisma.emailLoginCode.count({
+        where: { email, created_at: { gte: new Date(now - HOUR_MS) } },
+      }),
+      this.prisma.emailLoginCode.count({
+        where: { email, created_at: { gte: new Date(now - 24 * HOUR_MS) } },
+      }),
     ]);
     return hourly >= EMAIL_CODE_HOURLY_MAX || daily >= EMAIL_CODE_DAILY_MAX;
   }
@@ -253,17 +314,27 @@ export class AuthService {
     if (!record) throw invalid();
 
     if (record.expires_at.getTime() < Date.now()) {
-      await this.prisma.emailLoginCode.update({ where: { id: record.id }, data: { consumed_at: new Date() } });
+      await this.prisma.emailLoginCode.update({
+        where: { id: record.id },
+        data: { consumed_at: new Date() },
+      });
       throw invalid();
     }
 
     // 시도 횟수를 조건부로 먼저 올린다 — 동시 요청이 와도 상한을 넘겨 비교하지 못한다(원자적)
     const counted = await this.prisma.emailLoginCode.updateMany({
-      where: { id: record.id, consumed_at: null, attempts: { lt: EMAIL_CODE_MAX_ATTEMPTS } },
+      where: {
+        id: record.id,
+        consumed_at: null,
+        attempts: { lt: EMAIL_CODE_MAX_ATTEMPTS },
+      },
       data: { attempts: { increment: 1 } },
     });
     if (counted.count !== 1) {
-      await this.prisma.emailLoginCode.updateMany({ where: { id: record.id, consumed_at: null }, data: { consumed_at: new Date() } });
+      await this.prisma.emailLoginCode.updateMany({
+        where: { id: record.id, consumed_at: null },
+        data: { consumed_at: new Date() },
+      });
       throw invalid();
     }
 
@@ -284,28 +355,47 @@ export class AuthService {
   }
 
   // 로그인 세션 기록 — 동일 기기/IP면 활동시각 갱신, 새 조합이면 세션 생성 + (첫 로그인 제외) 새 기기 알림. 발급될 refresh 토큰과 연결할 세션 id 반환
-  private async recordLogin(userId: number, client: LoginClient): Promise<number> {
+  private async recordLogin(
+    userId: number,
+    client: LoginClient,
+  ): Promise<number> {
     const { device, type } = parseDevice(client.userAgent);
     const location = client.ip?.slice(0, 100) || '알 수 없음';
 
-    const priorCount = await this.prisma.loginSession.count({ where: { user_id: userId, revoked_at: null } });
+    const priorCount = await this.prisma.loginSession.count({
+      where: { user_id: userId, revoked_at: null },
+    });
     const existing = await this.prisma.loginSession.findFirst({
       where: { user_id: userId, device, location, revoked_at: null },
     });
 
     // 이번 로그인 기기만 현재 기기로 표시
-    await this.prisma.loginSession.updateMany({ where: { user_id: userId }, data: { is_current: false } });
+    await this.prisma.loginSession.updateMany({
+      where: { user_id: userId },
+      data: { is_current: false },
+    });
 
     if (existing) {
       await this.prisma.loginSession.update({
         where: { id: existing.id },
-        data: { is_current: true, last_active_at: new Date(), status: 'active' },
+        data: {
+          is_current: true,
+          last_active_at: new Date(),
+          status: 'active',
+        },
       });
       return existing.id;
     }
 
     const created = await this.prisma.loginSession.create({
-      data: { user_id: userId, device, device_type: type, location, is_current: true, status: 'active' },
+      data: {
+        user_id: userId,
+        device,
+        device_type: type,
+        location,
+        is_current: true,
+        status: 'active',
+      },
     });
 
     // 기존 세션이 있던 사용자에게만 새 기기 알림 (최초 로그인은 제외).
@@ -320,7 +410,10 @@ export class AuthService {
           description: `${device} (${location}) 에서 로그인되었습니다. 본인이 아니라면 보안 화면에서 세션을 로그아웃하세요.`,
           source: '보안',
         },
-        { url: '/security', body: `${device} (${location}) 에서 로그인되었습니다.` },
+        {
+          url: '/security',
+          body: `${device} (${location}) 에서 로그인되었습니다.`,
+        },
       );
     }
 
@@ -328,7 +421,10 @@ export class AuthService {
   }
 
   // 갱신 토큰 검증 → 화이트리스트 확인 후 rotation. 이미 회전된 옛 토큰은 15초 안이면 그 새 토큰으로 잇고, 지났으면 세션을 끊는다
-  async refresh(refreshToken: string, client?: LoginClient): Promise<IssuedTokens> {
+  async refresh(
+    refreshToken: string,
+    client?: LoginClient,
+  ): Promise<IssuedTokens> {
     if (!refreshToken) throw new UnauthorizedException('갱신 토큰이 없습니다.');
     let payload: { sub: number; jti?: string; type?: string };
     try {
@@ -336,14 +432,19 @@ export class AuthService {
     } catch {
       throw new UnauthorizedException('갱신 토큰이 유효하지 않습니다.');
     }
-    if (payload.type !== 'refresh' || !payload.jti) throw new UnauthorizedException('갱신 토큰이 아닙니다.');
+    if (payload.type !== 'refresh' || !payload.jti)
+      throw new UnauthorizedException('갱신 토큰이 아닙니다.');
 
-    const stored = await this.prisma.refreshToken.findUnique({ where: { jti: payload.jti } });
+    const stored = await this.prisma.refreshToken.findUnique({
+      where: { jti: payload.jti },
+    });
     if (!stored || stored.user_id !== payload.sub) {
       throw new UnauthorizedException('갱신 토큰이 유효하지 않습니다.');
     }
 
-    const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
+    const user = await this.prisma.user.findUnique({
+      where: { id: payload.sub },
+    });
     if (!user) throw new UnauthorizedException('사용자를 찾을 수 없습니다.');
 
     if (!stored.revoked_at) {
@@ -351,12 +452,17 @@ export class AuthService {
       if (rotated) return rotated;
     }
     // 이미 폐기된 토큰 — 같은 토큰으로 동시에 온 요청에 진 경우도 여기로 온다. 이긴 요청이 남긴 replaced_by 를 보려고 다시 읽는다
-    const latest = await this.prisma.refreshToken.findUnique({ where: { jti: payload.jti } });
+    const latest = await this.prisma.refreshToken.findUnique({
+      where: { jti: payload.jti },
+    });
     return this.reuseRotated(latest ?? stored, user, client);
   }
 
   // 회전 — 아직 폐기 안 된 행만 폐기하고(CAS) 1행을 바꾼 요청만 새 토큰을 받는다. 진 요청(동시 갱신)은 null
-  private async rotate(stored: RefreshToken, user: User): Promise<IssuedTokens | null> {
+  private async rotate(
+    stored: RefreshToken,
+    user: User,
+  ): Promise<IssuedTokens | null> {
     const newJti = randomUUID();
     const { jwt: ttl, ms } = await this.sessionExpiryOf(user.id);
     // 뒤 요청은 앞 요청의 행 잠금을 기다린 뒤 0행이 된다
@@ -377,13 +483,22 @@ export class AuthService {
       return true;
     });
     if (!claimed) return null;
-    return { access: this.signAccess(user), refresh: this.signRefresh(user.id, newJti, ttl), refreshTtlMs: ms };
+    return {
+      access: this.signAccess(user),
+      refresh: this.signRefresh(user.id, newJti, ttl),
+      refreshTtlMs: ms,
+    };
   }
 
   // 폐기된 토큰이 다시 왔을 때 — 회전으로 폐기된 지 15초 안이면 그 새 토큰(같은 jti)으로 다시 서명해 주고 접근 기록을 남긴다.
   // 15초가 지났으면 탈취로 보고 세션을 끊는다. 로그아웃 · 세션 끊기로 폐기된 토큰(replaced_by 없음)은 401 만
-  private async reuseRotated(stored: RefreshToken, user: User, client?: LoginClient): Promise<IssuedTokens> {
-    const invalid = () => new UnauthorizedException('갱신 토큰이 유효하지 않습니다.');
+  private async reuseRotated(
+    stored: RefreshToken,
+    user: User,
+    client?: LoginClient,
+  ): Promise<IssuedTokens> {
+    const invalid = () =>
+      new UnauthorizedException('갱신 토큰이 유효하지 않습니다.');
     if (!stored.revoked_at || !stored.replaced_by) throw invalid();
 
     if (Date.now() - stored.revoked_at.getTime() > REFRESH_REUSE_GRACE_MS) {
@@ -391,7 +506,9 @@ export class AuthService {
       throw invalid();
     }
 
-    const next = await this.prisma.refreshToken.findUnique({ where: { jti: stored.replaced_by } });
+    const next = await this.prisma.refreshToken.findUnique({
+      where: { jti: stored.replaced_by },
+    });
     const remainingMs = next ? next.expires_at.getTime() - Date.now() : 0;
     // 새 토큰이 그새 로그아웃 · 다시 회전됐으면 잇지 않는다 (세션은 끊지 않는다)
     if (!next || next.revoked_at || remainingMs <= 0) throw invalid();
@@ -399,37 +516,68 @@ export class AuthService {
     await this.accessLog.log(
       user.id,
       'refresh_grace',
-      { type: 'security', id: stored.session_id ?? 0, name: parseDevice(client?.userAgent).device },
+      {
+        type: 'security',
+        id: stored.session_id ?? 0,
+        name: parseDevice(client?.userAgent).device,
+      },
       client,
     );
     return {
       access: this.signAccess(user),
-      refresh: this.signRefresh(user.id, next.jti, Math.floor(remainingMs / 1000)),
+      refresh: this.signRefresh(
+        user.id,
+        next.jti,
+        Math.floor(remainingMs / 1000),
+      ),
       refreshTtlMs: remainingMs,
     };
   }
 
   // 허용 시간이 지난 옛 토큰 재사용 — 그 세션의 refresh 토큰 전부 · 세션 · 푸시 구독을 끊고(보안 화면의 기기 로그아웃과 같다) 알린다
-  private async revokeForReuse(stored: RefreshToken, client?: LoginClient): Promise<void> {
-    this.logger.warn(`폐기된 refresh 토큰 재사용 — 세션 끊음 (user=${stored.user_id}, session=${stored.session_id ?? '-'})`);
+  private async revokeForReuse(
+    stored: RefreshToken,
+    client?: LoginClient,
+  ): Promise<void> {
+    this.logger.warn(
+      `폐기된 refresh 토큰 재사용 — 세션 끊음 (user=${stored.user_id}, session=${stored.session_id ?? '-'})`,
+    );
     const now = new Date();
     const session = stored.session_id
-      ? await this.prisma.loginSession.findUnique({ where: { id: stored.session_id }, select: { device: true } })
+      ? await this.prisma.loginSession.findUnique({
+          where: { id: stored.session_id },
+          select: { device: true },
+        })
       : null;
     if (stored.session_id) {
       await this.prisma.$transaction([
-        this.prisma.loginSession.updateMany({ where: { id: stored.session_id, revoked_at: null }, data: { revoked_at: now } }),
-        this.prisma.refreshToken.updateMany({ where: { session_id: stored.session_id, revoked_at: null }, data: { revoked_at: now } }),
-        this.prisma.pushSubscription.deleteMany({ where: { session_id: stored.session_id } }),
+        this.prisma.loginSession.updateMany({
+          where: { id: stored.session_id, revoked_at: null },
+          data: { revoked_at: now },
+        }),
+        this.prisma.refreshToken.updateMany({
+          where: { session_id: stored.session_id, revoked_at: null },
+          data: { revoked_at: now },
+        }),
+        this.prisma.pushSubscription.deleteMany({
+          where: { session_id: stored.session_id },
+        }),
       ]);
     } else if (stored.replaced_by) {
       // 세션 없는 토큰(세션 행이 지워짐)은 이어 받은 새 토큰만 끊는다
-      await this.prisma.refreshToken.updateMany({ where: { jti: stored.replaced_by, revoked_at: null }, data: { revoked_at: now } });
+      await this.prisma.refreshToken.updateMany({
+        where: { jti: stored.replaced_by, revoked_at: null },
+        data: { revoked_at: now },
+      });
     }
     await this.accessLog.log(
       stored.user_id,
       'refresh_reuse',
-      { type: 'security', id: stored.session_id ?? 0, name: parseDevice(client?.userAgent).device },
+      {
+        type: 'security',
+        id: stored.session_id ?? 0,
+        name: parseDevice(client?.userAgent).device,
+      },
       client,
     );
 
@@ -445,7 +593,10 @@ export class AuthService {
           description: `${device} 에서 이미 바뀐 로그인 토큰이 다시 쓰여 그 기기의 로그인을 끊었습니다. 그 기기에서 연결이 끊겼던 것이면 다시 로그인하면 됩니다. 짐작 가는 일이 없다면 보안 화면에서 다른 기기도 확인하세요.`,
           source: '보안',
         },
-        { url: '/security', body: `${device} 의 로그인을 끊었습니다 — 이미 바뀐 로그인 토큰이 다시 쓰였습니다.` },
+        {
+          url: '/security',
+          body: `${device} 의 로그인을 끊었습니다 — 이미 바뀐 로그인 토큰이 다시 쓰였습니다.`,
+        },
       );
     } catch (e) {
       this.logger.warn(`재사용 차단 알림 실패: ${(e as Error).message}`);
@@ -459,7 +610,7 @@ export class AuthService {
     try {
       payload = this.verifyRefresh(refreshToken);
     } catch {
-      payload = this.jwtService.decode(refreshToken) as { jti?: string } | null;
+      payload = this.jwtService.decode(refreshToken);
     }
     if (!payload?.jti) return;
     const stored = await this.prisma.refreshToken.findUnique({
@@ -472,7 +623,9 @@ export class AuthService {
     });
     // 로그아웃한 기기로 알림이 계속 가지 않게 — 다시 로그인하면 앱이 구독을 다시 등록한다
     if (stored?.session_id) {
-      await this.prisma.pushSubscription.deleteMany({ where: { session_id: stored.session_id } });
+      await this.prisma.pushSubscription.deleteMany({
+        where: { session_id: stored.session_id },
+      });
     }
   }
 

@@ -130,7 +130,9 @@ describe('JobsMetaContributor (/_meta 의 jobs)', () => {
     const section = await collect(jobs('subscription-roll-forward'), prisma);
 
     expect(section.items[0]).toMatchObject({ sinceSuccessH: null });
-    expect(section.warn).toEqual(['subscription-roll-forward — 성공한 적 없음']);
+    expect(section.warn).toEqual([
+      'subscription-roll-forward — 성공한 적 없음',
+    ]);
   });
 
   it('아직 한 번도 실행되지 않은 잡(첫 주기 전)은 경고하지 않는다 — 매월 잡이 늘 경고로 뜨지 않게', async () => {

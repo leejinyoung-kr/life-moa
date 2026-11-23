@@ -24,7 +24,10 @@ export class PushService {
   ) {}
 
   // refresh 쿠키로 이 기기의 로그인 세션을 찾는다 — 검증 실패 · 폐기 · 남의 토큰이면 null
-  private async sessionOf(userId: number, refreshToken?: string): Promise<number | null> {
+  private async sessionOf(
+    userId: number,
+    refreshToken?: string,
+  ): Promise<number | null> {
     if (!refreshToken) return null;
     let jti: string | undefined;
     try {
@@ -40,7 +43,9 @@ export class PushService {
       where: { jti },
       select: { user_id: true, session_id: true, revoked_at: true },
     });
-    return stored && stored.user_id === userId && !stored.revoked_at ? stored.session_id : null;
+    return stored && stored.user_id === userId && !stored.revoked_at
+      ? stored.session_id
+      : null;
   }
 
   // 프론트가 구독 전 공개키를 받아간다. 비활성이면 enabled=false 만 반환
@@ -56,7 +61,12 @@ export class PushService {
     userAgent?: string,
     refreshToken?: string,
   ): Promise<{ ok: boolean }> {
-    if (!sub?.endpoint || !sub.keys?.p256dh || !sub.keys?.auth || !PUSH_ENDPOINT_PATTERN.test(sub.endpoint)) {
+    if (
+      !sub?.endpoint ||
+      !sub.keys?.p256dh ||
+      !sub.keys?.auth ||
+      !PUSH_ENDPOINT_PATTERN.test(sub.endpoint)
+    ) {
       return { ok: false };
     }
     const existing = await this.prisma.pushSubscription.findUnique({
@@ -86,15 +96,24 @@ export class PushService {
   }
 
   // 구독 해제 — endpoint 기준 삭제
-  async unsubscribe(userId: number, endpoint: string): Promise<{ ok: boolean }> {
-    await this.prisma.pushSubscription.deleteMany({ where: { user_id: userId, endpoint } });
+  async unsubscribe(
+    userId: number,
+    endpoint: string,
+  ): Promise<{ ok: boolean }> {
+    await this.prisma.pushSubscription.deleteMany({
+      where: { user_id: userId, endpoint },
+    });
     return { ok: true };
   }
 
   // 테스트 발송 — 본인 모든 기기로 더미 푸시. 결과를 화면에서 바로 봐야 하므로 아웃박스를 거치지 않고 바로 보낸다.
   // 진단용 상태(서버활성/구독수)도 반환
-  async sendTest(userId: number): Promise<{ enabled: boolean; subscriptions: number }> {
-    const subscriptions = await this.prisma.pushSubscription.count({ where: { user_id: userId } });
+  async sendTest(
+    userId: number,
+  ): Promise<{ enabled: boolean; subscriptions: number }> {
+    const subscriptions = await this.prisma.pushSubscription.count({
+      where: { user_id: userId },
+    });
     const { enabled } = this.webPush.getPublicKey();
     if (enabled && subscriptions > 0) {
       await this.channel.deliver(userId, {
@@ -108,7 +127,11 @@ export class PushService {
 
   // 알림 행과 같은 트랜잭션에 푸시를 적재한다 — 커밋돼야 나간다(롤백되면 푸시도 사라진다).
   // 멱등키는 알림 id — 같은 알림으로 두 번 보내지 않는다
-  async enqueue(tx: unknown, notificationId: number, message: PushMessage): Promise<void> {
+  async enqueue(
+    tx: unknown,
+    notificationId: number,
+    message: PushMessage,
+  ): Promise<void> {
     // 푸시가 꺼진 환경(VAPID 키 없음)에서는 보낼 곳이 없으므로 쌓지 않는다. 앱 내 알림은 그대로 남는다
     if (!this.webPush.getPublicKey().enabled) return;
     await this.outbox.enqueue(tx, {

@@ -1,4 +1,14 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Put, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  ParseIntPipe,
+  Post,
+  Put,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '@leejinyoung-kr/core-auth';
 import { JwtAuthGuard } from '@leejinyoung-kr/core-auth';
@@ -24,13 +34,19 @@ export class TransactionFavoriteController {
 
   // 즐겨찾기 추가
   @Post()
-  create(@CurrentUser() user: AuthUser, @Body() dto: CreateTransactionFavoriteDto) {
+  create(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: CreateTransactionFavoriteDto,
+  ) {
     return this.service.create(user.id, dto);
   }
 
   // 표시 순서 변경
   @Put('order')
-  reorder(@CurrentUser() user: AuthUser, @Body() dto: ReorderTransactionFavoriteDto) {
+  reorder(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: ReorderTransactionFavoriteDto,
+  ) {
     return this.service.reorder(user.id, dto.ids);
   }
 

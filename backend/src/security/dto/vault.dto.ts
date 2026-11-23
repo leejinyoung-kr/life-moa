@@ -1,4 +1,12 @@
-import { IsInt, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
+import {
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+  MinLength,
+} from 'class-validator';
 
 // 마스터 비번 최소 길이 — 해시가 백업·DB 로 새도 오프라인 대입을 버티도록. 기존 짧은 비번은 해제·잠금해제에 그대로 쓰인다
 export const MIN_MASTER_PASSWORD = 8;

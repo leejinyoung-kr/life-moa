@@ -26,8 +26,13 @@ export class ImportController {
   @Post('credentials')
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @ApiConsumes('multipart/form-data')
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024 } }))
-  restoreCredentials(@CurrentUser() user: AuthUser, @UploadedFile() file?: Express.Multer.File) {
+  @UseInterceptors(
+    FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024 } }),
+  )
+  restoreCredentials(
+    @CurrentUser() user: AuthUser,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
     if (!file) throw new BadRequestException('업로드할 파일이 없습니다.');
     return this.service.restoreCredentials(user, file.buffer);
   }

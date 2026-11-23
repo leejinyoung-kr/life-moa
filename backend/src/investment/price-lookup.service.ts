@@ -18,10 +18,37 @@ const FRANKFURTER_EXCHANGE_RATE_API = 'https://api.frankfurter.app/latest';
 
 const EXCHANGE_RATE_CACHE_TTL_MS = 10 * 60 * 1000; // 환율은 10분 캐시 (요청마다 외부 API 호출 방지)
 
+// 네이버 실시간 시세 응답 중 쓰는 칸 — 비공식 API 라 모두 없을 수 있다
+interface NaverStockResponse {
+  datas?: { closePriceRaw?: string; stockName?: string }[];
+}
+
+// 야후 차트 응답 중 쓰는 칸
+interface YahooChartResponse {
+  chart?: {
+    result?: {
+      meta?: {
+        regularMarketPrice?: number;
+        currency?: string;
+        longName?: string;
+        shortName?: string;
+      };
+    }[];
+  };
+}
+
+// frankfurter 환율 응답 — rates[통화] = 환율
+interface FrankfurterResponse {
+  rates?: Record<string, number>;
+}
+
 // 국내/해외 종목 시세조회 — 둘 다 키 발급 없이 쓸 수 있는 비공식 API 사용
 @Injectable()
 export class PriceLookupService {
-  private readonly exchangeRateCache = new Map<string, { rate: number; expiresAt: number }>();
+  private readonly exchangeRateCache = new Map<
+    string,
+    { rate: number; expiresAt: number }
+  >();
   // 종목 type 기준으로 국내(네이버)/해외(야후) 조회처를 분기
   async lookup(
     type: InvestmentType,
@@ -38,7 +65,7 @@ export class PriceLookupService {
       headers: { 'User-Agent': 'Mozilla/5.0' },
     });
     if (!res.ok) throw new BadRequestException('시세 조회에 실패했습니다.');
-    const json = await res.json();
+    const json = (await res.json()) as NaverStockResponse | null;
     const data = json?.datas?.[0];
     const price = Number(data?.closePriceRaw);
     if (!data || !Number.isFinite(price))
@@ -58,10 +85,10 @@ export class PriceLookupService {
       { headers: { 'User-Agent': 'Mozilla/5.0' } },
     );
     if (!res.ok) throw new BadRequestException('시세 조회에 실패했습니다.');
-    const json = await res.json();
+    const json = (await res.json()) as YahooChartResponse | null;
     const meta = json?.chart?.result?.[0]?.meta;
     const price = Number(meta?.regularMarketPrice);
-    const currency = meta?.currency as string | undefined;
+    const currency = meta?.currency;
     if (!meta || !Number.isFinite(price) || !currency) {
       throw new BadRequestException('티커를 찾을 수 없습니다.');
     }
@@ -91,12 +118,15 @@ export class PriceLookupService {
       `${FRANKFURTER_EXCHANGE_RATE_API}?from=${from}&to=${to}`,
     );
     if (!res.ok) throw new BadRequestException('환율 조회에 실패했습니다.');
-    const json = await res.json();
+    const json = (await res.json()) as FrankfurterResponse | null;
     const rate = Number(json?.rates?.[to]);
     if (!Number.isFinite(rate))
       throw new BadRequestException('환율 조회에 실패했습니다.');
 
-    this.exchangeRateCache.set(cacheKey, { rate, expiresAt: Date.now() + EXCHANGE_RATE_CACHE_TTL_MS });
+    this.exchangeRateCache.set(cacheKey, {
+      rate,
+      expiresAt: Date.now() + EXCHANGE_RATE_CACHE_TTL_MS,
+    });
     return rate;
   }
 }

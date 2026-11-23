@@ -38,13 +38,21 @@ export class PrismaOutboxStore extends OutboxStore {
       });
       return true;
     } catch (e) {
-      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') return false;
+      if (
+        e instanceof Prisma.PrismaClientKnownRequestError &&
+        e.code === 'P2002'
+      )
+        return false;
       throw e;
     }
   }
 
   // 후보를 고른 뒤 행마다 pending → sending 으로 바꿔 본다. 바뀐 행만 이 프로세스 것이다
-  async claim(now: Date, claimUntil: Date, limit: number): Promise<OutboxPending[]> {
+  async claim(
+    now: Date,
+    claimUntil: Date,
+    limit: number,
+  ): Promise<OutboxPending[]> {
     const candidates = await this.prisma.outboxMessage.findMany({
       where: { status: 'pending', available_at: { lte: now } },
       orderBy: { available_at: 'asc' },

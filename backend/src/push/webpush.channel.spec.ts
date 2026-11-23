@@ -7,7 +7,12 @@ describe('WebPushChannel', () => {
   let webPush: any;
   let channel: WebPushChannel;
 
-  const message = { userId: 1, title: '새 기기에서 로그인', body: 'Windows · Chrome', url: '/security' };
+  const message = {
+    userId: 1,
+    title: '새 기기에서 로그인',
+    body: 'Windows · Chrome',
+    url: '/security',
+  };
   const subs = [
     { id: 1, endpoint: 'https://push/1', p256dh: 'a', auth: 'b' },
     { id: 2, endpoint: 'https://push/2', p256dh: 'c', auth: 'd' },
@@ -21,7 +26,9 @@ describe('WebPushChannel', () => {
       },
     };
     webPush = {
-      getPublicKey: jest.fn().mockReturnValue({ enabled: true, publicKey: 'pub' }),
+      getPublicKey: jest
+        .fn()
+        .mockReturnValue({ enabled: true, publicKey: 'pub' }),
       sendToSubscription: jest.fn().mockResolvedValue({ ok: true }),
     };
     channel = new WebPushChannel(prisma, webPush);
@@ -38,7 +45,11 @@ describe('WebPushChannel', () => {
   });
 
   it('만료(404/410) 구독은 지우고, 남은 기기가 없어도 재시도하지 않는다', async () => {
-    webPush.sendToSubscription.mockResolvedValue({ ok: false, expired: true, error: '구독이 만료·폐기됨 (status 410)' });
+    webPush.sendToSubscription.mockResolvedValue({
+      ok: false,
+      expired: true,
+      error: '구독이 만료·폐기됨 (status 410)',
+    });
 
     await expect(channel.send(message)).resolves.toBeUndefined();
     expect(prisma.pushSubscription.delete).toHaveBeenCalledTimes(2);
@@ -53,7 +64,10 @@ describe('WebPushChannel', () => {
   });
 
   it('모든 기기가 실패하면 원인을 담아 던진다 — 아웃박스가 재시도한다', async () => {
-    webPush.sendToSubscription.mockResolvedValue({ ok: false, error: 'status 500, body: ?' });
+    webPush.sendToSubscription.mockResolvedValue({
+      ok: false,
+      error: 'status 500, body: ?',
+    });
 
     await expect(channel.send(message)).rejects.toThrow('기기 2대 모두 실패');
     await expect(channel.send(message)).rejects.toThrow('status 500');
@@ -66,6 +80,8 @@ describe('WebPushChannel', () => {
 
   it('푸시가 꺼져 있으면 재시도해도 소용없다 — OutboxPermanentError', async () => {
     webPush.getPublicKey.mockReturnValue({ enabled: false, publicKey: null });
-    await expect(channel.send(message)).rejects.toBeInstanceOf(OutboxPermanentError);
+    await expect(channel.send(message)).rejects.toBeInstanceOf(
+      OutboxPermanentError,
+    );
   });
 });

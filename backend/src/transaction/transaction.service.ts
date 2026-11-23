@@ -1,6 +1,13 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import {
-  Prisma, Transaction, TransactionType, TransferTarget,
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import {
+  Prisma,
+  Transaction,
+  TransactionType,
+  TransferTarget,
 } from '@prisma/client';
 import * as ExcelJS from 'exceljs';
 import type { Writable } from 'stream';
@@ -10,7 +17,11 @@ import { QueryTransactionDto } from './dto/query-transaction.dto';
 import { UpdateTransactionDto } from './dto/update-transaction.dto';
 import { parsePage } from '@leejinyoung-kr/core-common';
 import {
-  RRule, toDateStr, periodOf, adjustWeekend, monthlyDate, nthOccurrence, monthRange,
+  RRule,
+  toDateStr,
+  periodOf,
+  nthOccurrence,
+  monthRange,
 } from './recurring.util';
 import { SystemLogService } from '../system-log/system-log.service';
 
@@ -40,7 +51,14 @@ const EXPORT_COLUMNS: { header: string; key: string; width: number }[] = [
 ];
 
 // 양식 필수 컬럼 (헤더의 '*'/공백 제거 후 기준)
-const REQUIRED_HEADERS = ['유형', '카테고리', '내역', '결제수단', '금액', '날짜'];
+const REQUIRED_HEADERS = [
+  '유형',
+  '카테고리',
+  '내역',
+  '결제수단',
+  '금액',
+  '날짜',
+];
 
 // 엑셀 업로드 결과 요약
 export interface ImportResult {
@@ -117,14 +135,18 @@ export class TransactionService {
         where: { id: targetId, user_id: userId, deleted_at: null },
         data: { balance: { increment: signedAmount } },
       });
-      if (!count && required) throw new BadRequestException('이동 대상 예적금을 찾을 수 없습니다.');
+      if (!count && required)
+        throw new BadRequestException('이동 대상 예적금을 찾을 수 없습니다.');
     } else {
       // target_id는 InvestmentAccount.id — 계좌 예수금에 누적(계좌 내 종목들이 공유)
       const { count } = await tx.investmentAccount.updateMany({
         where: { id: targetId, user_id: userId, deleted_at: null },
         data: { cash_balance: { increment: signedAmount } },
       });
-      if (!count && required) throw new BadRequestException('이동 대상 투자 계좌를 찾을 수 없습니다.');
+      if (!count && required)
+        throw new BadRequestException(
+          '이동 대상 투자 계좌를 찾을 수 없습니다.',
+        );
     }
   }
 
@@ -136,11 +158,27 @@ export class TransactionService {
     patch: Prisma.TransactionUpdateInput,
   ): Promise<Transaction> {
     if (row.target_type && row.target_id) {
-      await this.applyTransferEffect(tx, userId, row.target_type, row.target_id, row.amount.negated(), false);
+      await this.applyTransferEffect(
+        tx,
+        userId,
+        row.target_type,
+        row.target_id,
+        row.amount.negated(),
+        false,
+      );
     }
-    const updated = await tx.transaction.update({ where: { id: row.id }, data: patch });
+    const updated = await tx.transaction.update({
+      where: { id: row.id },
+      data: patch,
+    });
     if (updated.target_type && updated.target_id) {
-      await this.applyTransferEffect(tx, userId, updated.target_type, updated.target_id, updated.amount);
+      await this.applyTransferEffect(
+        tx,
+        userId,
+        updated.target_type,
+        updated.target_id,
+        updated.amount,
+      );
     }
     return updated;
   }
@@ -150,14 +188,22 @@ export class TransactionService {
   // RecurringCronService가 매일 오전 9시에 전체 사용자 대상으로 호출(조회/생성 시점에는 호출하지 않음).
   async materializeRecurring(userId: number): Promise<number> {
     const schedules = await this.prisma.recurringSchedule.findMany({
-      where: { user_id: userId, deleted_at: null, kind: 'transaction', active: true },
+      where: {
+        user_id: userId,
+        deleted_at: null,
+        kind: 'transaction',
+        active: true,
+      },
     });
     if (!schedules.length) return 0;
     const now = new Date();
 
     // 이미 생성된 회차(삭제분 포함) — 설정마다 조회하지 않고 한 번에 읽어 설정별로 나눈다
     const existing = await this.prisma.transaction.findMany({
-      where: { user_id: userId, recurring_schedule_id: { in: schedules.map((s) => s.id) } },
+      where: {
+        user_id: userId,
+        recurring_schedule_id: { in: schedules.map((s) => s.id) },
+      },
       select: { recurring_schedule_id: true, recurring_period: true },
     });
     const havePeriods = new Map<number, Set<string>>();
@@ -175,7 +221,8 @@ export class TransactionService {
       const have = havePeriods.get(s.id) ?? new Set<string>();
 
       const toCreate: Prisma.TransactionCreateManyInput[] = [];
-      for (let i = 0; i <= 120; i++) { // 안전 상한
+      for (let i = 0; i <= 120; i++) {
+        // 안전 상한
         const occ = nthOccurrence(s.start_date, rule, i);
         if (occ > now) break;
         if (occ < s.start_date) continue; // 시작일 이전 회차(연간 i=0이 시작월보다 이른 달인 경우)는 만들지 않음
@@ -183,10 +230,18 @@ export class TransactionService {
         if (have.has(period)) continue;
         have.add(period);
         toCreate.push({
-          user_id: userId, type: s.tx_type!, date: occ, title: s.title!, category: s.category!,
-          amount: s.amount!, pay_method: s.pay_method ?? '', memo: s.memo,
-          recurring_schedule_id: s.id, recurring_period: period,
-          target_type: s.target_type, target_id: s.target_id,
+          user_id: userId,
+          type: s.tx_type!,
+          date: occ,
+          title: s.title!,
+          category: s.category!,
+          amount: s.amount!,
+          pay_method: s.pay_method ?? '',
+          memo: s.memo,
+          recurring_schedule_id: s.id,
+          recurring_period: period,
+          target_type: s.target_type,
+          target_id: s.target_id,
         });
       }
       if (toCreate.length) {
@@ -194,18 +249,31 @@ export class TransactionService {
           await tx.transaction.createMany({ data: toCreate });
           // 자산이동 자동이체 설정이면 새로 생성된 회차분만큼 대상 잔액에 일괄 누적 (회차당 금액은 설정과 동일)
           if (s.target_type && s.target_id) {
-            await this.applyTransferEffect(tx, userId, s.target_type, s.target_id, s.amount!.mul(toCreate.length));
+            await this.applyTransferEffect(
+              tx,
+              userId,
+              s.target_type,
+              s.target_id,
+              s.amount!.mul(toCreate.length),
+            );
           }
           await tx.recurringSchedule.update({
             where: { id: s.id },
-            data: { last_period: toCreate[toCreate.length - 1].recurring_period as string },
+            data: {
+              last_period: toCreate[toCreate.length - 1]
+                .recurring_period as string,
+            },
           });
         });
         this.sysLog.info({
           userId,
           category: 'recurring_tx',
           message: `반복거래 '${s.title}' ${toCreate.length}건 회차 생성`,
-          metadata: { scheduleId: s.id, title: s.title, periods: toCreate.map((c) => c.recurring_period) },
+          metadata: {
+            scheduleId: s.id,
+            title: s.title,
+            periods: toCreate.map((c) => c.recurring_period),
+          },
         });
       }
     }
@@ -223,7 +291,10 @@ export class TransactionService {
   }
 
   // 목록/내보내기 공통 where 빌더 — 날짜범위/유형/카테고리/검색어 필터
-  private buildWhere(userId: number, query: QueryTransactionDto): Prisma.TransactionWhereInput {
+  private buildWhere(
+    userId: number,
+    query: QueryTransactionDto,
+  ): Prisma.TransactionWhereInput {
     const where: Prisma.TransactionWhereInput = {
       user_id: userId,
       deleted_at: null,
@@ -231,7 +302,7 @@ export class TransactionService {
     if (query.from || query.to) {
       where.date = {
         ...(query.from ? { gte: new Date(query.from) } : {}),
-        ...(query.to   ? { lte: new Date(query.to)   } : {}),
+        ...(query.to ? { lte: new Date(query.to) } : {}),
       };
     }
     if (query.type) where.type = query.type;
@@ -242,9 +313,18 @@ export class TransactionService {
 
   // 현재 필터(where)에 해당하는 전체 행의 유형별 합계 — 페이지와 무관하게 필터 전체 기준
   private async sumsFor(where: Prisma.TransactionWhereInput) {
-    const grouped = await this.prisma.transaction.groupBy({ by: ['type'], where, _sum: { amount: true } });
-    const sumOf = (type: TransactionType) => grouped.find((g) => g.type === type)?._sum.amount?.toNumber() ?? 0;
-    return { sumIncome: sumOf('income'), sumExpense: sumOf('expense'), sumTransfer: sumOf('transfer') };
+    const grouped = await this.prisma.transaction.groupBy({
+      by: ['type'],
+      where,
+      _sum: { amount: true },
+    });
+    const sumOf = (type: TransactionType) =>
+      grouped.find((g) => g.type === type)?._sum.amount?.toNumber() ?? 0;
+    return {
+      sumIncome: sumOf('income'),
+      sumExpense: sumOf('expense'),
+      sumTransfer: sumOf('transfer'),
+    };
   }
 
   // 내역 목록 — 날짜범위/유형/카테고리/검색어 필터.
@@ -252,16 +332,30 @@ export class TransactionService {
   // page 지정 시 서버 페이징(Paginated), 없으면 전체 배열.
   async findAll(userId: number, query: QueryTransactionDto) {
     const where = this.buildWhere(userId, query);
-    const orderBy: Prisma.TransactionOrderByWithRelationInput[] = [{ date: 'desc' }, { id: 'desc' }];
+    const orderBy: Prisma.TransactionOrderByWithRelationInput[] = [
+      { date: 'desc' },
+      { id: 'desc' },
+    ];
 
     const pg = parsePage(query.page, query.limit);
     if (pg) {
       const [rows, total] = await this.prisma.$transaction([
-        this.prisma.transaction.findMany({ where, orderBy, skip: pg.skip, take: pg.take }),
+        this.prisma.transaction.findMany({
+          where,
+          orderBy,
+          skip: pg.skip,
+          take: pg.take,
+        }),
         this.prisma.transaction.count({ where }),
       ]);
       const sums = await this.sumsFor(where);
-      return { items: rows.map((r) => this.toDto(r)), total, page: pg.page, limit: pg.limit, ...sums };
+      return {
+        items: rows.map((r) => this.toDto(r)),
+        total,
+        page: pg.page,
+        limit: pg.limit,
+        ...sums,
+      };
     }
 
     const [rows, sums] = await Promise.all([
@@ -334,7 +428,8 @@ export class TransactionService {
   // 내역 추가
   async create(userId: number, dto: CreateTransactionDto) {
     const date = new Date(dto.date);
-    const hasTarget = dto.type === 'transfer' && dto.targetType != null && dto.targetId != null;
+    const hasTarget =
+      dto.type === 'transfer' && dto.targetType != null && dto.targetId != null;
 
     const created = await this.prisma.$transaction(async (tx) => {
       const row = await tx.transaction.create({
@@ -352,7 +447,13 @@ export class TransactionService {
         },
       });
       if (hasTarget) {
-        await this.applyTransferEffect(tx, userId, dto.targetType!, dto.targetId!, row.amount);
+        await this.applyTransferEffect(
+          tx,
+          userId,
+          dto.targetType!,
+          dto.targetId!,
+          row.amount,
+        );
       }
       return row;
     });
@@ -379,7 +480,9 @@ export class TransactionService {
     });
     const missingHeader = REQUIRED_HEADERS.filter((h) => !colOf[h]);
     if (missingHeader.length) {
-      throw new BadRequestException(`양식 헤더 누락: ${missingHeader.join(', ')}`);
+      throw new BadRequestException(
+        `양식 헤더 누락: ${missingHeader.join(', ')}`,
+      );
     }
 
     // 카테고리 라벨 → 코드 (소분류만 — 대분류는 거래에 직접 저장 안 함, 동명 라벨 충돌 방지)
@@ -404,12 +507,22 @@ export class TransactionService {
       const typeLabel = String(row.getCell(colOf['유형']).text ?? '').trim();
       const catLabel = String(row.getCell(colOf['카테고리']).text ?? '').trim();
       const title = String(row.getCell(colOf['내역']).text ?? '').trim();
-      const payMethod = String(row.getCell(colOf['결제수단']).text ?? '').trim();
+      const payMethod = String(
+        row.getCell(colOf['결제수단']).text ?? '',
+      ).trim();
       const amountRaw = row.getCell(colOf['금액']).value;
       const dateRaw = row.getCell(colOf['날짜']).value;
 
       // 완전 빈 행은 건너뜀
-      if (!typeLabel && !catLabel && !title && !payMethod && amountRaw == null && dateRaw == null) continue;
+      if (
+        !typeLabel &&
+        !catLabel &&
+        !title &&
+        !payMethod &&
+        amountRaw == null &&
+        dateRaw == null
+      )
+        continue;
 
       const type = TYPE_CODE[typeLabel];
       const category = catCode.get(catLabel);
@@ -430,10 +543,12 @@ export class TransactionService {
         continue;
       }
 
-      const memo = memoCol ? String(row.getCell(memoCol).text ?? '').trim() : '';
+      const memo = memoCol
+        ? String(row.getCell(memoCol).text ?? '').trim()
+        : '';
       valid.push({
         user_id: userId,
-        type: type!,
+        type: type,
         date: date!,
         title,
         category: category!,
@@ -447,7 +562,9 @@ export class TransactionService {
     // 대량 INSERT 패킷 한계 회피 — 1000건씩 분할 등록
     const CHUNK = 1000;
     for (let i = 0; i < valid.length; i += CHUNK) {
-      await this.prisma.transaction.createMany({ data: valid.slice(i, i + CHUNK) });
+      await this.prisma.transaction.createMany({
+        data: valid.slice(i, i + CHUNK),
+      });
     }
     return { imported: valid.length, failed: errors.length, errors };
   }
@@ -455,7 +572,11 @@ export class TransactionService {
   // 현재 필터(findAll 동일)에 해당하는 내역을 .xlsx 로 스트리밍 내보낸다.
   // 전체 메모리 적재를 피하려 행은 커서 배치로 읽고 exceljs 스트림 라이터로 응답에 바로 흘려보낸다.
   // 카테고리/유형은 코드→라벨로 변환해 양식과 동일한 형태로 출력(재업로드 가능).
-  async streamExport(userId: number, query: QueryTransactionDto, stream: Writable): Promise<void> {
+  async streamExport(
+    userId: number,
+    query: QueryTransactionDto,
+    stream: Writable,
+  ): Promise<void> {
     const where = this.buildWhere(userId, query);
     const cats = await this.prisma.category.findMany({
       where: { domain: 'transaction' },
@@ -473,7 +594,10 @@ export class TransactionService {
     });
     const bankLabel = new Map(banks.map((c) => [c.code, c.label]));
 
-    const wb = new ExcelJS.stream.xlsx.WorkbookWriter({ stream, useStyles: true });
+    const wb = new ExcelJS.stream.xlsx.WorkbookWriter({
+      stream,
+      useStyles: true,
+    });
     const ws = wb.addWorksheet('가계부');
     ws.columns = EXPORT_COLUMNS;
     ws.getColumn('amount').numFmt = '#,##0';
@@ -483,7 +607,11 @@ export class TransactionService {
     head.font = { bold: true };
     head.alignment = { horizontal: 'center', vertical: 'middle' };
     head.eachCell((cell) => {
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEFEFEF' } };
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFEFEFEF' },
+      };
     });
     head.commit();
 
@@ -503,11 +631,12 @@ export class TransactionService {
           type: TYPE_LABEL[t.type],
           category: catLabel.get(t.category) ?? t.category,
           title: t.title,
-          payMethod: t.type === 'expense'
-            ? (payMethodLabel.get(t.pay_method) ?? t.pay_method)
-            : t.type === 'income'
-              ? (bankLabel.get(t.pay_method) ?? t.pay_method)
-              : t.pay_method,
+          payMethod:
+            t.type === 'expense'
+              ? (payMethodLabel.get(t.pay_method) ?? t.pay_method)
+              : t.type === 'income'
+                ? (bankLabel.get(t.pay_method) ?? t.pay_method)
+                : t.pay_method,
           amount: t.amount.toNumber(),
           date: toDateStr(t.date),
           memo: t.memo ?? '',
@@ -517,7 +646,8 @@ export class TransactionService {
       if (rows.length < BATCH) break;
     }
 
-    await ws.commit();
+    // 시트 commit 은 동기(void), 통합 문서 commit 만 Promise 다
+    ws.commit();
     await wb.commit();
   }
 
@@ -539,7 +669,8 @@ export class TransactionService {
       date: dto.date ? new Date(dto.date) : undefined,
       title: dto.title,
       category: dto.category,
-      amount: dto.amount !== undefined ? new Prisma.Decimal(dto.amount) : undefined,
+      amount:
+        dto.amount !== undefined ? new Prisma.Decimal(dto.amount) : undefined,
       pay_method: dto.payMethod,
       memo: dto.memo,
       target_type: dto.targetType !== undefined ? dto.targetType : undefined,
@@ -557,9 +688,19 @@ export class TransactionService {
     const target = await this.findOwned(userId, id);
     await this.prisma.$transaction(async (tx) => {
       if (target.target_type && target.target_id) {
-        await this.applyTransferEffect(tx, userId, target.target_type, target.target_id, target.amount.negated(), false);
+        await this.applyTransferEffect(
+          tx,
+          userId,
+          target.target_type,
+          target.target_id,
+          target.amount.negated(),
+          false,
+        );
       }
-      await tx.transaction.update({ where: { id }, data: { deleted_at: new Date() } });
+      await tx.transaction.update({
+        where: { id },
+        data: { deleted_at: new Date() },
+      });
     });
     return { id };
   }
@@ -571,17 +712,31 @@ export class TransactionService {
       where: { id: { in: ids }, user_id: userId, deleted_at: null },
     });
     // 행마다 update 하면 행 수(자산이동이면 그 두 배)만큼 쿼리가 나간다(N+1)
-    const byTarget = new Map<string, { type: TransferTarget; id: number; sum: Prisma.Decimal }>();
+    const byTarget = new Map<
+      string,
+      { type: TransferTarget; id: number; sum: Prisma.Decimal }
+    >();
     for (const row of rows) {
       if (!row.target_type || !row.target_id) continue;
       const key = `${row.target_type}:${row.target_id}`;
-      const cur = byTarget.get(key) ?? { type: row.target_type, id: row.target_id, sum: new Prisma.Decimal(0) };
+      const cur = byTarget.get(key) ?? {
+        type: row.target_type,
+        id: row.target_id,
+        sum: new Prisma.Decimal(0),
+      };
       cur.sum = cur.sum.add(row.amount);
       byTarget.set(key, cur);
     }
     await this.prisma.$transaction(async (tx) => {
       for (const t of byTarget.values()) {
-        await this.applyTransferEffect(tx, userId, t.type, t.id, t.sum.negated(), false);
+        await this.applyTransferEffect(
+          tx,
+          userId,
+          t.type,
+          t.id,
+          t.sum.negated(),
+          false,
+        );
       }
       await tx.transaction.updateMany({
         where: { id: { in: rows.map((r) => r.id) }, user_id: userId },

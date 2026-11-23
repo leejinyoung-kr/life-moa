@@ -30,7 +30,9 @@ describe('PrismaOutboxStore', () => {
   });
 
   it('넘겨받은 트랜잭션(tx)에 적재한다 — 롤백되면 메시지도 사라지게', async () => {
-    const tx = { outboxMessage: { create: jest.fn().mockResolvedValue({ id: 9 }) } };
+    const tx = {
+      outboxMessage: { create: jest.fn().mockResolvedValue({ id: 9 }) },
+    };
 
     expect(await store.enqueue(tx, message)).toBe(true);
     // 트랜잭션 밖 클라이언트로 새지 않아야 한다
@@ -51,23 +53,48 @@ describe('PrismaOutboxStore', () => {
   it('멱등키 유니크 충돌(P2002)이면 이미 적재된 것 → false', async () => {
     const tx = {
       outboxMessage: {
-        create: jest.fn().mockRejectedValue(
-          new Prisma.PrismaClientKnownRequestError('Unique constraint failed', { code: 'P2002', clientVersion: 'test' }),
-        ),
+        create: jest
+          .fn()
+          .mockRejectedValue(
+            new Prisma.PrismaClientKnownRequestError(
+              'Unique constraint failed',
+              { code: 'P2002', clientVersion: 'test' },
+            ),
+          ),
       },
     };
     expect(await store.enqueue(tx, message)).toBe(false);
   });
 
   it('그 밖의 DB 오류는 그대로 던진다 — 알림 트랜잭션이 함께 롤백되게', async () => {
-    const tx = { outboxMessage: { create: jest.fn().mockRejectedValue(new Error('connect ETIMEDOUT')) } };
-    await expect(store.enqueue(tx, message)).rejects.toThrow('connect ETIMEDOUT');
+    const tx = {
+      outboxMessage: {
+        create: jest.fn().mockRejectedValue(new Error('connect ETIMEDOUT')),
+      },
+    };
+    await expect(store.enqueue(tx, message)).rejects.toThrow(
+      'connect ETIMEDOUT',
+    );
   });
 
   it('선점은 pending 인 행만 바꿔 성공한 것만 가져간다', async () => {
     prisma.outboxMessage.findMany.mockResolvedValue([
-      { id: 3, channel: 'webpush', payload: JSON.stringify(message.payload), idempotency_key: 'noti:42', attempts: 1, max_attempts: 5 },
-      { id: 4, channel: 'webpush', payload: '{}', idempotency_key: 'noti:43', attempts: 0, max_attempts: 5 },
+      {
+        id: 3,
+        channel: 'webpush',
+        payload: JSON.stringify(message.payload),
+        idempotency_key: 'noti:42',
+        attempts: 1,
+        max_attempts: 5,
+      },
+      {
+        id: 4,
+        channel: 'webpush',
+        payload: '{}',
+        idempotency_key: 'noti:43',
+        attempts: 0,
+        max_attempts: 5,
+      },
     ]);
     // 두 번째 행은 다른 프로세스가 먼저 가져간 상황
     prisma.outboxMessage.updateMany
@@ -79,7 +106,14 @@ describe('PrismaOutboxStore', () => {
     const claimed = await store.claim(now, claimUntil, 20);
 
     expect(claimed).toEqual([
-      { id: 3, channel: 'webpush', payload: message.payload, idempotencyKey: 'noti:42', attempts: 1, maxAttempts: 5 },
+      {
+        id: 3,
+        channel: 'webpush',
+        payload: message.payload,
+        idempotencyKey: 'noti:42',
+        attempts: 1,
+        maxAttempts: 5,
+      },
     ]);
     expect(prisma.outboxMessage.updateMany).toHaveBeenCalledWith({
       where: { id: 3, status: 'pending' },
@@ -89,7 +123,12 @@ describe('PrismaOutboxStore', () => {
 
   it('재시도는 pending 으로 되돌리고 다음 시각을 적는다 — 시스템 로그는 남기지 않는다', async () => {
     const nextAt = new Date('2026-09-20T09:00:30+09:00');
-    await store.markFailed(3, { attempts: 1, error: 'Error: 푸시 서버 502', nextAt, at: new Date() });
+    await store.markFailed(3, {
+      attempts: 1,
+      error: 'Error: 푸시 서버 502',
+      nextAt,
+      at: new Date(),
+    });
 
     expect(prisma.outboxMessage.updateMany).toHaveBeenCalledWith({
       where: { id: 3, status: 'sending' },
@@ -114,7 +153,12 @@ describe('PrismaOutboxStore', () => {
 
     expect(prisma.outboxMessage.updateMany).toHaveBeenCalledWith({
       where: { id: 3, status: 'sending' },
-      data: { status: 'failed', attempts: 5, last_error: 'Error: 푸시 서버 502\n    at send (x.ts:1:1)', claimed_until: null },
+      data: {
+        status: 'failed',
+        attempts: 5,
+        last_error: 'Error: 푸시 서버 502\n    at send (x.ts:1:1)',
+        claimed_until: null,
+      },
     });
     expect(sysLog.error).toHaveBeenCalledWith({
       category: 'notification',
@@ -125,7 +169,12 @@ describe('PrismaOutboxStore', () => {
 
   it('이미 마감된 행이면(변경 0건) 시스템 로그를 남기지 않는다', async () => {
     prisma.outboxMessage.updateMany.mockResolvedValue({ count: 0 });
-    await store.markFailed(3, { attempts: 5, error: 'x', nextAt: null, at: new Date() });
+    await store.markFailed(3, {
+      attempts: 5,
+      error: 'x',
+      nextAt: null,
+      at: new Date(),
+    });
     expect(sysLog.error).not.toHaveBeenCalled();
   });
 

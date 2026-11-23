@@ -46,7 +46,12 @@ export function adjustWeekend(d: Date, mode?: string): Date {
 }
 
 // 해당 (연,월)의 기준일 날짜 — 말일 초과 시 말일로 클램프 + 주말 보정
-export function monthlyDate(y: number, m: number, day: number, adj?: string): Date {
+export function monthlyDate(
+  y: number,
+  m: number,
+  day: number,
+  adj?: string,
+): Date {
   const dim = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
   return adjustWeekend(new Date(Date.UTC(y, m, Math.min(day, dim))), adj);
 }

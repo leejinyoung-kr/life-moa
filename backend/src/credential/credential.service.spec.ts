@@ -25,13 +25,28 @@ describe('CredentialService', () => {
     prisma = {
       credential: {
         findMany: jest.fn(async ({ where }: any) =>
-          store.filter((r) => r.user_id === where.user_id && r.deleted_at == null),
+          store.filter(
+            (r) => r.user_id === where.user_id && r.deleted_at == null,
+          ),
         ),
-        findFirst: jest.fn(async ({ where }: any) =>
-          store.find((r) => r.id === where.id && r.user_id === where.user_id && r.deleted_at == null) ?? null,
+        findFirst: jest.fn(
+          async ({ where }: any) =>
+            store.find(
+              (r) =>
+                r.id === where.id &&
+                r.user_id === where.user_id &&
+                r.deleted_at == null,
+            ) ?? null,
         ),
         create: jest.fn(async ({ data }: any) => {
-          const row = { id: seq++, deleted_at: null, updated_at: new Date(), backup_codes_enc: null, totp_enc: null, ...data };
+          const row = {
+            id: seq++,
+            deleted_at: null,
+            updated_at: new Date(),
+            backup_codes_enc: null,
+            totp_enc: null,
+            ...data,
+          };
           store.push(row);
           return row;
         }),
@@ -42,7 +57,14 @@ describe('CredentialService', () => {
           return row;
         }),
         createMany: jest.fn(async ({ data }: any) => {
-          for (const d of data) store.push({ id: seq++, deleted_at: null, updated_at: new Date(), backup_codes_enc: null, ...d });
+          for (const d of data)
+            store.push({
+              id: seq++,
+              deleted_at: null,
+              updated_at: new Date(),
+              backup_codes_enc: null,
+              ...d,
+            });
           return { count: data.length };
         }),
       },
@@ -50,7 +72,12 @@ describe('CredentialService', () => {
   });
 
   it('create: 비번 암호화 저장 + toDto 는 원문 숨김', async () => {
-    const res = await svc().create(1, { name: 'GitHub', category: 'dev', username: 'me', password: 'p@ss' } as any);
+    const res = await svc().create(1, {
+      name: 'GitHub',
+      category: 'dev',
+      username: 'me',
+      password: 'p@ss',
+    });
     expect(res).not.toHaveProperty('password');
     expect(res.has2fa).toBe(false);
     expect(store[0].password_enc).toMatch(/^v2:test:/);
@@ -59,33 +86,65 @@ describe('CredentialService', () => {
   });
 
   it('reveal: 복호화된 비번/TOTP 반환 + 감사 로그 기록', async () => {
-    await svc().create(1, { name: 'A', category: 'c', username: 'u', password: 'secret', totp: 'JBSWY3DPEHPK3PXP' } as any);
+    await svc().create(1, {
+      name: 'A',
+      category: 'c',
+      username: 'u',
+      password: 'secret',
+      totp: 'JBSWY3DPEHPK3PXP',
+    });
     const out = await svc().reveal(1, 1);
     expect(out.password).toBe('secret');
     expect(out.totp).toBe('JBSWY3DPEHPK3PXP');
-    expect(accessLog.log).toHaveBeenCalledWith(1, 'cred_reveal', expect.objectContaining({ id: 1 }), undefined);
+    expect(accessLog.log).toHaveBeenCalledWith(
+      1,
+      'cred_reveal',
+      expect.objectContaining({ id: 1 }),
+      undefined,
+    );
   });
 
   it('reveal: 타인/없는 항목은 NotFound', async () => {
-    await svc().create(1, { name: 'A', category: 'c', username: 'u', password: 'x' } as any);
+    await svc().create(1, {
+      name: 'A',
+      category: 'c',
+      username: 'u',
+      password: 'x',
+    });
     await expect(svc().reveal(2, 1)).rejects.toThrow(NotFoundException);
   });
 
   it('totpCode: otpauth:// URI 에서 secret 추출해 6자리 생성', async () => {
     const uri = 'otpauth://totp/Acme:me?secret=JBSWY3DPEHPK3PXP&issuer=Acme';
-    await svc().create(1, { name: 'A', category: 'c', username: 'u', password: 'x', totp: uri } as any);
+    await svc().create(1, {
+      name: 'A',
+      category: 'c',
+      username: 'u',
+      password: 'x',
+      totp: uri,
+    });
     const out = await svc().totpCode(1, 1);
     expect(out.code).toMatch(/^\d{6}$/);
     expect(out.period).toBe(30);
   });
 
   it('totpCode: 2FA 없으면 BadRequest', async () => {
-    await svc().create(1, { name: 'A', category: 'c', username: 'u', password: 'x' } as any);
+    await svc().create(1, {
+      name: 'A',
+      category: 'c',
+      username: 'u',
+      password: 'x',
+    });
     await expect(svc().totpCode(1, 1)).rejects.toThrow(BadRequestException);
   });
 
   it('백업코드: 생성 → 암호화 저장 → reveal 라운드트립', async () => {
-    await svc().create(1, { name: 'A', category: 'c', username: 'u', password: 'x' } as any);
+    await svc().create(1, {
+      name: 'A',
+      category: 'c',
+      username: 'u',
+      password: 'x',
+    });
     const gen = await svc().generateBackupCodes(1, 1, 5);
     expect(gen.codes).toHaveLength(5);
     expect(gen.codes[0]).toMatch(/^[0-9A-F]{4}-[0-9A-F]{4}$/);
@@ -94,12 +153,19 @@ describe('CredentialService', () => {
   });
 
   it('update: 새 비번 주면 재암호화 + 회전일 갱신', async () => {
-    await svc().create(1, { name: 'A', category: 'c', username: 'u', password: 'old' } as any);
+    await svc().create(1, {
+      name: 'A',
+      category: 'c',
+      username: 'u',
+      password: 'old',
+    });
     const before = store[0].password_changed_at.getTime();
     await new Promise((r) => setTimeout(r, 5));
-    await svc().update(1, 1, { password: 'new' } as any);
+    await svc().update(1, 1, { password: 'new' });
     expect(crypto.decrypt(store[0].password_enc, PW)).toBe('new');
-    expect(store[0].password_changed_at.getTime()).toBeGreaterThanOrEqual(before);
+    expect(store[0].password_changed_at.getTime()).toBeGreaterThanOrEqual(
+      before,
+    );
   });
 
   it('importExcel: 필수값 누락 행은 error, 정상 행만 imported', async () => {
@@ -114,7 +180,12 @@ describe('CredentialService', () => {
   });
 
   it('export → import 라운드트립: 평문 비번 보존', async () => {
-    await svc().create(1, { name: 'A', category: 'c', username: 'u', password: 'roundtrip!' } as any);
+    await svc().create(1, {
+      name: 'A',
+      category: 'c',
+      username: 'u',
+      password: 'roundtrip!',
+    });
     const out = await svc().exportExcel(1);
     store.length = 0;
     const res = await svc().importExcel(1, out);
@@ -137,8 +208,16 @@ describe('CredentialService', () => {
 async function buildExcel(rows: Record<string, string>[]): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet('계정');
-  const headers = ['서비스명', 'URL', '카테고리', '아이디', '비밀번호', '2FA', '메모'];
+  const headers = [
+    '서비스명',
+    'URL',
+    '카테고리',
+    '아이디',
+    '비밀번호',
+    '2FA',
+    '메모',
+  ];
   ws.addRow(headers);
   for (const r of rows) ws.addRow(headers.map((h) => r[h] ?? ''));
-  return Buffer.from((await wb.xlsx.writeBuffer()) as ArrayBuffer);
+  return Buffer.from(await wb.xlsx.writeBuffer());
 }

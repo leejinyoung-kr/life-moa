@@ -12,7 +12,10 @@ export interface Crumb {
 }
 
 // 루트 → 해당 폴더까지의 경로 (폴더 자신 포함). 끊긴 부모·순환이 있으면 거기서 멈춘다
-export function folderPath(byId: Map<number, FolderNode>, folderId: number | null): Crumb[] {
+export function folderPath(
+  byId: Map<number, FolderNode>,
+  folderId: number | null,
+): Crumb[] {
   const path: Crumb[] = [];
   const seen = new Set<number>();
   let cur = folderId;
@@ -49,8 +52,13 @@ export function subtreeIds(folders: FolderNode[], rootId: number): Set<number> {
 
 // ZIP 안 경로 한 칸으로 쓸 수 있게 — 구분자·Windows 금지 문자는 _ 로, 끝의 점·공백은 뗀다
 export function safeSegment(name: string): string {
-  // eslint-disable-next-line no-control-regex -- 제어 문자도 파일명에 못 쓴다
-  const cleaned = name.normalize('NFC').replace(/[\\/:*?"<>|\x00-\x1f]/g, '_').replace(/[. ]+$/, '').trim();
+  const cleaned = name
+    .normalize('NFC')
+    // 제어 문자(\x00-\x1f)는 Windows 파일 이름에 못 쓰여 일부러 바꾼다
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\\/:*?"<>|\x00-\x1f]/g, '_')
+    .replace(/[. ]+$/, '')
+    .trim();
   return cleaned || '_';
 }
 
@@ -63,7 +71,8 @@ export function uniquePath(used: Set<string>, path: string): string {
   const base = dot > 0 ? file.slice(0, dot) : file;
   const ext = dot > 0 ? file.slice(dot) : '';
   let candidate = path;
-  for (let n = 2; used.has(candidate.toLowerCase()); n++) candidate = `${dir}${base} (${n})${ext}`;
+  for (let n = 2; used.has(candidate.toLowerCase()); n++)
+    candidate = `${dir}${base} (${n})${ext}`;
   used.add(candidate.toLowerCase());
   return candidate;
 }
@@ -78,7 +87,8 @@ export function zipPaths(
   const out = new Map<number, string>();
   for (const f of files) {
     const crumbs = folderPath(byId, f.folder_id);
-    const start = rootId === null ? 0 : crumbs.findIndex((c) => c.id === rootId) + 1;
+    const start =
+      rootId === null ? 0 : crumbs.findIndex((c) => c.id === rootId) + 1;
     const dirs = crumbs.slice(start).map((c) => safeSegment(c.name));
     out.set(f.id, uniquePath(used, [...dirs, safeSegment(f.name)].join('/')));
   }

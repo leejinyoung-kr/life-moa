@@ -36,10 +36,7 @@ export class FileController {
 
   // 현재 폴더의 하위 폴더·파일 + 브레드크럼 + 전체 사용량
   @Get()
-  list(
-    @CurrentUser() user: AuthUser,
-    @Query('folderId') folderId?: string,
-  ) {
+  list(@CurrentUser() user: AuthUser, @Query('folderId') folderId?: string) {
     return this.service.list(user.id, folderId ? Number(folderId) : undefined);
   }
 
@@ -51,9 +48,19 @@ export class FileController {
 
   // ZIP 으로 받기 전 요약 — 담길 파일 수·용량, 한 번에 받을 수 있는 상한
   @Get('zip/summary')
-  async zipSummary(@CurrentUser() user: AuthUser, @Query('folderId') folderId?: string) {
-    const plan = await this.service.planZip(user.id, folderId ? Number(folderId) : undefined);
-    return { fileCount: plan.entries.length, totalBytes: plan.totalBytes, maxBytes: ZIP_MAX_BYTES };
+  async zipSummary(
+    @CurrentUser() user: AuthUser,
+    @Query('folderId') folderId?: string,
+  ) {
+    const plan = await this.service.planZip(
+      user.id,
+      folderId ? Number(folderId) : undefined,
+    );
+    return {
+      fileCount: plan.entries.length,
+      totalBytes: plan.totalBytes,
+      maxBytes: ZIP_MAX_BYTES,
+    };
   }
 
   // 폴더(없으면 보관함 전체)를 하위 폴더까지 ZIP 하나로 내려준다 — 폴더 구조 유지
@@ -63,11 +70,17 @@ export class FileController {
     @Res() res: Response,
     @Query('folderId') folderId?: string,
   ) {
-    const plan = await this.service.planZip(user.id, folderId ? Number(folderId) : undefined);
+    const plan = await this.service.planZip(
+      user.id,
+      folderId ? Number(folderId) : undefined,
+    );
     this.service.assertZippable(plan);
 
     res.setHeader('Content-Type', 'application/zip');
-    res.setHeader('Content-Disposition', contentDisposition('attachment', `${plan.rootName ?? '파일보관함'}.zip`));
+    res.setHeader(
+      'Content-Disposition',
+      contentDisposition('attachment', `${plan.rootName ?? '파일보관함'}.zip`),
+    );
     try {
       await this.service.streamZip(user.id, plan.entries, res);
     } catch (err) {
@@ -78,9 +91,19 @@ export class FileController {
 
   // 비우기 전 요약 — 지울 폴더·파일 수와 용량
   @Get('clear/summary')
-  async clearSummary(@CurrentUser() user: AuthUser, @Query('folderId') folderId?: string) {
-    const plan = await this.service.planClear(user.id, folderId ? Number(folderId) : undefined);
-    return { folderCount: plan.folderIds.length, fileCount: plan.fileIds.length, totalBytes: plan.totalBytes };
+  async clearSummary(
+    @CurrentUser() user: AuthUser,
+    @Query('folderId') folderId?: string,
+  ) {
+    const plan = await this.service.planClear(
+      user.id,
+      folderId ? Number(folderId) : undefined,
+    );
+    return {
+      folderCount: plan.folderIds.length,
+      fileCount: plan.fileIds.length,
+      totalBytes: plan.totalBytes,
+    };
   }
 
   // 비우기 — 폴더(없으면 보관함 전체) 안의 하위 폴더·파일을 한 번에 지운다
@@ -93,14 +116,24 @@ export class FileController {
   // path(예: "보험/2026")를 주면 folderId 아래에 그 폴더들을 찾거나 만들어 넣는다 — 폴더째 업로드
   @Post('upload')
   @ApiConsumes('multipart/form-data')
-  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: MAX_UPLOAD_BYTES } }))
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: MAX_UPLOAD_BYTES },
+    }),
+  )
   upload(
     @CurrentUser() user: AuthUser,
     @UploadedFile() file: Express.Multer.File,
     @Query('folderId') folderId?: string,
     @Query('path') relDir?: string,
   ) {
-    return this.service.upload(user.id, file, folderId ? Number(folderId) : undefined, relDir || undefined);
+    return this.service.upload(
+      user.id,
+      file,
+      folderId ? Number(folderId) : undefined,
+      relDir || undefined,
+    );
   }
 
   // presigned 다운로드/미리보기 URL 발급 (?disposition=inline 이면 브라우저 내 미리보기용)
@@ -110,7 +143,11 @@ export class FileController {
     @Param('id', ParseIntPipe) id: number,
     @Query('disposition') disposition?: string,
   ) {
-    return this.service.getDownloadUrl(user.id, id, disposition === 'inline' ? 'inline' : 'attachment');
+    return this.service.getDownloadUrl(
+      user.id,
+      id,
+      disposition === 'inline' ? 'inline' : 'attachment',
+    );
   }
 
   // 텍스트 파일 미리보기 — 앞부분(최대 512KB)을 글자로 { text, truncated }
@@ -143,10 +180,7 @@ export class FileController {
 
   // 폴더 생성 (parentId 없으면 루트)
   @Post('folders')
-  createFolder(
-    @CurrentUser() user: AuthUser,
-    @Body() dto: CreateFolderDto,
-  ) {
+  createFolder(@CurrentUser() user: AuthUser, @Body() dto: CreateFolderDto) {
     return this.service.createFolder(user.id, dto);
   }
 

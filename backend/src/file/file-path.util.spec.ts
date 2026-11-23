@@ -1,4 +1,11 @@
-import { folderPath, safeSegment, subtreeIds, uniquePath, zipPaths, type FolderNode } from './file-path.util';
+import {
+  folderPath,
+  safeSegment,
+  subtreeIds,
+  uniquePath,
+  zipPaths,
+  type FolderNode,
+} from './file-path.util';
 
 // 루트: 보험(1) ─ 2026(2) ─ 영수증(3), 사진(4)
 const FOLDERS: FolderNode[] = [
@@ -11,12 +18,19 @@ const byId = new Map(FOLDERS.map((f) => [f.id, f]));
 
 describe('file-path.util', () => {
   it('folderPath 는 루트부터 그 폴더까지 이어 준다', () => {
-    expect(folderPath(byId, 3).map((c) => c.name)).toEqual(['보험', '2026', '영수증']);
+    expect(folderPath(byId, 3).map((c) => c.name)).toEqual([
+      '보험',
+      '2026',
+      '영수증',
+    ]);
     expect(folderPath(byId, null)).toEqual([]);
   });
 
   it('folderPath 는 순환이 있어도 멈춘다', () => {
-    const loop = new Map<number, FolderNode>([[1, { id: 1, name: 'a', parent_id: 2 }], [2, { id: 2, name: 'b', parent_id: 1 }]]);
+    const loop = new Map<number, FolderNode>([
+      [1, { id: 1, name: 'a', parent_id: 2 }],
+      [2, { id: 2, name: 'b', parent_id: 1 }],
+    ]);
     expect(folderPath(loop, 1).map((c) => c.name)).toEqual(['b', 'a']);
   });
 
@@ -47,7 +61,14 @@ describe('file-path.util', () => {
       { id: 12, name: 'b.jpg', folder_id: 3 },
       { id: 13, name: 'root.txt', folder_id: null },
     ];
-    expect([...zipPaths(byId, null, files).values()]).toEqual(['보험/a.pdf', '보험/2026/영수증/b.jpg', '보험/2026/영수증/b (2).jpg', 'root.txt']);
-    expect([...zipPaths(byId, 2, files.slice(1, 2)).values()]).toEqual(['영수증/b.jpg']);
+    expect([...zipPaths(byId, null, files).values()]).toEqual([
+      '보험/a.pdf',
+      '보험/2026/영수증/b.jpg',
+      '보험/2026/영수증/b (2).jpg',
+      'root.txt',
+    ]);
+    expect([...zipPaths(byId, 2, files.slice(1, 2)).values()]).toEqual([
+      '영수증/b.jpg',
+    ]);
   });
 });

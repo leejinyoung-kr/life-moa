@@ -59,12 +59,22 @@ export class ExportService {
   // 암호화 컬럼은 암호문 그대로 포함(복호화하지 않음). 설정의 마스터 잠금 해시는 복원에 쓰이지 않고
   // 파일이 새면 오프라인 대입으로 이어지므로 뺀다
   async backupZip(userId: number, client?: ClientInfo): Promise<Buffer> {
-    await this.accessLog.log(userId, 'data_export', { type: 'account', id: userId, name: 'export:backup' }, client);
+    await this.accessLog.log(
+      userId,
+      'data_export',
+      { type: 'account', id: userId, name: 'export:backup' },
+      client,
+    );
     const where = { where: { user_id: userId, deleted_at: null } };
     const [
-      transactions, savings, investments, subscriptions,
-      calendarEvents, notifications,
-      categories, credentials,
+      transactions,
+      savings,
+      investments,
+      subscriptions,
+      calendarEvents,
+      notifications,
+      categories,
+      credentials,
       settings,
     ] = await this.prisma.$transaction([
       this.prisma.transaction.findMany(where),
@@ -82,13 +92,19 @@ export class ExportService {
     ]);
 
     const zip = new AdmZip();
-    const json = (v: unknown) => Buffer.from(JSON.stringify(v, null, 2), 'utf8');
+    const json = (v: unknown) =>
+      Buffer.from(JSON.stringify(v, null, 2), 'utf8');
 
     // 도메인별 JSON
     const data: Record<string, unknown> = {
-      transactions, savings, investments, subscriptions,
-      calendarEvents, notifications,
-      categories, credentials,
+      transactions,
+      savings,
+      investments,
+      subscriptions,
+      calendarEvents,
+      notifications,
+      categories,
+      credentials,
       settings,
     };
     for (const [name, rows] of Object.entries(data)) {

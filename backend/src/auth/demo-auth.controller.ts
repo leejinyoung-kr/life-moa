@@ -22,7 +22,10 @@ export class DemoAuthController {
   @Public()
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Post('demo')
-  async demoLogin(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+  async demoLogin(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     const { access, refresh, refreshTtlMs } = await this.authService.demoLogin({
       ip: clientIp(req),
       userAgent: req.headers['user-agent'],

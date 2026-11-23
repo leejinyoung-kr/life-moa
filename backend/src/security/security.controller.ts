@@ -75,14 +75,22 @@ export class SecurityController {
 
   // 마스터 잠금 해제(비활성화)
   @Post('vault/disable')
-  vaultDisable(@CurrentUser() user: AuthUser, @Body() dto: VaultPasswordDto, @Client() client: ClientInfo) {
+  vaultDisable(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: VaultPasswordDto,
+    @Client() client: ClientInfo,
+  ) {
     return this.vault.disable(user.id, dto.password, client);
   }
 
   // 잠금 해제 — vault 토큰 발급. 마스터 비번 무차별 대입 방지로 분당 5회 제한
   @Post('vault/unlock')
   @Throttle({ default: { limit: 5, ttl: 60000 } })
-  vaultUnlock(@CurrentUser() user: AuthUser, @Body() dto: VaultPasswordDto, @Client() client: ClientInfo) {
+  vaultUnlock(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: VaultPasswordDto,
+    @Client() client: ClientInfo,
+  ) {
     return this.vault.unlock(user.id, dto.password, client);
   }
 }

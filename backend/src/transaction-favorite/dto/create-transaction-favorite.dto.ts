@@ -1,5 +1,11 @@
 import { TransactionType } from '@prisma/client';
-import { IsIn, IsNumber, IsOptional, IsString, MaxLength } from 'class-validator';
+import {
+  IsIn,
+  IsNumber,
+  IsOptional,
+  IsString,
+  MaxLength,
+} from 'class-validator';
 
 export class CreateTransactionFavoriteDto {
   // 수입/지출만 — 자산이동은 대상 계좌가 얽혀 있어 즐겨찾기로 두지 않는다

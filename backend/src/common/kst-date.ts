@@ -3,7 +3,9 @@
 
 // 지금 시각의 한국 날짜 'YYYY-MM-DD'
 export function kstDateStr(now: Date = new Date()): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(now);
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(
+    now,
+  );
 }
 
 // 오늘(KST) 날짜를 UTC 자정 Date 로

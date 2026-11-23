@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma, Saving } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { todayKst } from '../common/kst-date';
@@ -34,7 +38,10 @@ export class SavingService {
 
   // 예적금 목록 — 유형/상품명 필터. page 지정 시 서버 페이징, 없으면 전체 배열
   async findAll(userId: number, query: QuerySavingDto = {}) {
-    const where: Prisma.SavingWhereInput = { user_id: userId, deleted_at: null };
+    const where: Prisma.SavingWhereInput = {
+      user_id: userId,
+      deleted_at: null,
+    };
     if (query.type) where.type = query.type;
     if (query.q) where.name = { contains: query.q };
     const orderBy: Prisma.SavingOrderByWithRelationInput = { id: 'desc' };
@@ -42,10 +49,20 @@ export class SavingService {
     const pg = parsePage(query.page, query.limit);
     if (pg) {
       const [rows, total] = await this.prisma.$transaction([
-        this.prisma.saving.findMany({ where, orderBy, skip: pg.skip, take: pg.take }),
+        this.prisma.saving.findMany({
+          where,
+          orderBy,
+          skip: pg.skip,
+          take: pg.take,
+        }),
         this.prisma.saving.count({ where }),
       ]);
-      return { items: rows.map((r) => this.toDto(r)), total, page: pg.page, limit: pg.limit };
+      return {
+        items: rows.map((r) => this.toDto(r)),
+        total,
+        page: pg.page,
+        limit: pg.limit,
+      };
     }
 
     const rows = await this.prisma.saving.findMany({ where, orderBy });
@@ -58,7 +75,10 @@ export class SavingService {
       where: { user_id: userId, deleted_at: null },
     });
     const totalBalance = rows.reduce((s, r) => s + r.balance.toNumber(), 0);
-    const monthlyDeposit = rows.reduce((s, r) => s + r.monthly_amount.toNumber(), 0);
+    const monthlyDeposit = rows.reduce(
+      (s, r) => s + r.monthly_amount.toNumber(),
+      0,
+    );
     const avgRate = rows.length
       ? rows.reduce((s, r) => s + r.interest_rate.toNumber(), 0) / rows.length
       : 0;
@@ -67,7 +87,8 @@ export class SavingService {
     const today = todayKst();
     const in30 = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
     const maturityNear = rows.filter(
-      (r) => r.maturity_date && r.maturity_date >= today && r.maturity_date <= in30,
+      (r) =>
+        r.maturity_date && r.maturity_date >= today && r.maturity_date <= in30,
     ).length;
 
     return {
@@ -116,12 +137,21 @@ export class SavingService {
         name: dto.name,
         type: dto.type,
         interest_rate:
-          dto.interestRate !== undefined ? new Prisma.Decimal(dto.interestRate) : undefined,
+          dto.interestRate !== undefined
+            ? new Prisma.Decimal(dto.interestRate)
+            : undefined,
         monthly_amount:
-          dto.monthlyAmount !== undefined ? new Prisma.Decimal(dto.monthlyAmount) : undefined,
+          dto.monthlyAmount !== undefined
+            ? new Prisma.Decimal(dto.monthlyAmount)
+            : undefined,
         start_date: dto.startDate ? new Date(dto.startDate) : undefined,
-        maturity_date: dto.maturityDate ? new Date(dto.maturityDate) : undefined,
-        balance: dto.balance !== undefined ? new Prisma.Decimal(dto.balance) : undefined,
+        maturity_date: dto.maturityDate
+          ? new Date(dto.maturityDate)
+          : undefined,
+        balance:
+          dto.balance !== undefined
+            ? new Prisma.Decimal(dto.balance)
+            : undefined,
         memo: dto.memo,
       },
     });

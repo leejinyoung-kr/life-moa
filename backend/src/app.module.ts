@@ -46,12 +46,20 @@ import { env } from './config/env';
   imports: [
     // 예약 작업(@Job, maintenance/) — 실행 기록은 job_run, 실패는 시스템 로그에도 남긴다.
     // lease 안에 끝나지 않거나 프로세스가 죽어 끝을 기록하지 못한 실행은 failed(lease_expired)로 마감된다
-    JobsModule.forRoot({ store: PrismaJobRunStore, imports: [SystemLogModule], timeZone: 'Asia/Seoul' }),
+    JobsModule.forRoot({
+      store: PrismaJobRunStore,
+      imports: [SystemLogModule],
+      timeZone: 'Asia/Seoul',
+    }),
     // GET /_meta — 지금 무엇이 돌고 있는지(빌드 커밋·코어 패키지 버전 + 예약 작업·아웃박스·알림 채널).
     // 전역 JwtAuthGuard 를 그대로 받으므로 로그인해야 보인다(@Public 아님)
     MetaModule.forRoot({
       commit: env.GIT_COMMIT,
-      contributors: [JobsMetaContributor, OutboxMetaContributor, NotificationMetaContributor],
+      contributors: [
+        JobsMetaContributor,
+        OutboxMetaContributor,
+        NotificationMetaContributor,
+      ],
       imports: [PrismaModule, PushModule],
     }),
     // 기본 분당 120요청(IP) — 민감 엔드포인트는 @Throttle 로 더 엄격히 제한

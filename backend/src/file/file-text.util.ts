@@ -5,7 +5,11 @@ export const TEXT_PREVIEW_MAX_BYTES = 512 * 1024;
 
 // 글자로 미리 볼 수 있는 파일인지 — text/* · JSON · XML · YAML, 또는 형식 정보가 없어도 흔한 텍스트 확장자
 export function isTextPreviewable(mime: string, name: string): boolean {
-  if (mime.startsWith('text/') || /^application\/(json|xml|x-yaml|yaml)$/.test(mime)) return true;
+  if (
+    mime.startsWith('text/') ||
+    /^application\/(json|xml|x-yaml|yaml)$/.test(mime)
+  )
+    return true;
   return /\.(txt|md|csv|tsv|log|json|ya?ml|xml|ini|conf)$/i.test(name);
 }
 

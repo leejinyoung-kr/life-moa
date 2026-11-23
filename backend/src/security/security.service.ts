@@ -38,16 +38,25 @@ export class SecurityService {
       where: { id, user_id: userId, revoked_at: null },
     });
     if (!session) throw new NotFoundException('세션을 찾을 수 없습니다.');
-    if (session.is_current) throw new NotFoundException('현재 기기는 로그아웃할 수 없습니다.');
+    if (session.is_current)
+      throw new NotFoundException('현재 기기는 로그아웃할 수 없습니다.');
     await this.prisma.$transaction([
-      this.prisma.loginSession.update({ where: { id }, data: { revoked_at: new Date() } }),
+      this.prisma.loginSession.update({
+        where: { id },
+        data: { revoked_at: new Date() },
+      }),
       this.prisma.refreshToken.updateMany({
         where: { session_id: id, revoked_at: null },
         data: { revoked_at: new Date() },
       }),
       this.prisma.pushSubscription.deleteMany({ where: { session_id: id } }),
     ]);
-    await this.accessLog.log(userId, 'session_revoke', { type: 'security', id, name: session.device }, client);
+    await this.accessLog.log(
+      userId,
+      'session_revoke',
+      { type: 'security', id, name: session.device },
+      client,
+    );
     return { id };
   }
 
@@ -59,14 +68,24 @@ export class SecurityService {
     });
     const ids = sessions.map((s) => s.id);
     await this.prisma.$transaction([
-      this.prisma.loginSession.updateMany({ where: { id: { in: ids } }, data: { revoked_at: new Date() } }),
+      this.prisma.loginSession.updateMany({
+        where: { id: { in: ids } },
+        data: { revoked_at: new Date() },
+      }),
       this.prisma.refreshToken.updateMany({
         where: { session_id: { in: ids }, revoked_at: null },
         data: { revoked_at: new Date() },
       }),
-      this.prisma.pushSubscription.deleteMany({ where: { session_id: { in: ids } } }),
+      this.prisma.pushSubscription.deleteMany({
+        where: { session_id: { in: ids } },
+      }),
     ]);
-    await this.accessLog.log(userId, 'session_revoke', { type: 'security', id: userId, name: `all:${ids.length}` }, client);
+    await this.accessLog.log(
+      userId,
+      'session_revoke',
+      { type: 'security', id: userId, name: `all:${ids.length}` },
+      client,
+    );
     return { revoked: ids.length };
   }
 }

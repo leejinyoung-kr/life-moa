@@ -39,24 +39,35 @@ export class DbBackupCronService {
     const dir = env.BACKUP_DIR ?? join(process.cwd(), 'backups');
     await mkdir(dir, { recursive: true });
 
-    const date = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10); // KST 날짜
+    const date = new Date(Date.now() + 9 * 3600 * 1000)
+      .toISOString()
+      .slice(0, 10); // KST 날짜
     const filePath = join(dir, `${BACKUP_PREFIX}${date}.sql.gz`);
     const { host, port, user, password, database } = parseDbUrl(
       env.DATABASE_URL,
     );
 
     try {
-      const dump = spawn('mariadb-dump', [
-        '-h', host,
-        '-P', port,
-        '-u', user,
-        `-p${password}`,
-        '--single-transaction',
-        '--routines',
-        database,
-      ], { signal: ctx.signal });
+      const dump = spawn(
+        'mariadb-dump',
+        [
+          '-h',
+          host,
+          '-P',
+          port,
+          '-u',
+          user,
+          `-p${password}`,
+          '--single-transaction',
+          '--routines',
+          database,
+        ],
+        { signal: ctx.signal },
+      );
       let stderr = '';
-      dump.stderr.on('data', (d) => { stderr += d.toString(); });
+      dump.stderr.on('data', (d: Buffer) => {
+        stderr += d.toString();
+      });
       const exited = new Promise<void>((resolve, reject) => {
         dump.on('error', reject);
         dump.on('close', (code) => {
@@ -65,7 +76,10 @@ export class DbBackupCronService {
         });
       });
       // 파일까지 다 써진 뒤에 성공으로 본다(프로세스 종료만 보면 gzip 끝부분이 덜 써질 수 있다)
-      await Promise.all([pipeline(dump.stdout, createGzip(), createWriteStream(filePath)), exited]);
+      await Promise.all([
+        pipeline(dump.stdout, createGzip(), createWriteStream(filePath)),
+        exited,
+      ]);
     } catch (e) {
       await unlink(filePath).catch(() => undefined);
       throw e;
@@ -82,7 +96,11 @@ export class DbBackupCronService {
     const files = await readdir(dir);
     let removed = 0;
     for (const f of files) {
-      if (!PURGE_PREFIXES.some((p) => f.startsWith(p)) || !f.endsWith('.sql.gz')) continue;
+      if (
+        !PURGE_PREFIXES.some((p) => f.startsWith(p)) ||
+        !f.endsWith('.sql.gz')
+      )
+        continue;
       const full = join(dir, f);
       const info = await stat(full);
       if (info.mtimeMs < cutoff) {

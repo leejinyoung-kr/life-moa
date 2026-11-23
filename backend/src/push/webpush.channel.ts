@@ -46,13 +46,17 @@ export class WebPushChannel extends OutboxChannel {
     const result = await this.deliver(userId, rest);
 
     if (!result.enabled) {
-      throw new OutboxPermanentError('Web Push 가 꺼져 있습니다 (VAPID 키 없음).');
+      throw new OutboxPermanentError(
+        'Web Push 가 꺼져 있습니다 (VAPID 키 없음).',
+      );
     }
     // 한 기기라도 갔으면 성공으로 본다 — 재시도하면 이미 받은 기기에 또 간다.
     // 보낼 기기가 없거나(구독 0) 만료 구독뿐이면 재시도할 것도 없다
     if (result.sent > 0 || result.failed === 0) return;
 
-    throw new Error(`기기 ${result.devices}대 모두 실패 — ${result.errors.join(' / ')}`);
+    throw new Error(
+      `기기 ${result.devices}대 모두 실패 — ${result.errors.join(' / ')}`,
+    );
   }
 
   // 한 사용자의 모든 기기로 발송하고 결과를 센다. 만료(404/410) 구독은 정리한다
@@ -67,7 +71,9 @@ export class WebPushChannel extends OutboxChannel {
     };
     if (!result.enabled) return result;
 
-    const subs = await this.prisma.pushSubscription.findMany({ where: { user_id: userId } });
+    const subs = await this.prisma.pushSubscription.findMany({
+      where: { user_id: userId },
+    });
     result.devices = subs.length;
     if (!subs.length) return result;
 
@@ -83,7 +89,9 @@ export class WebPushChannel extends OutboxChannel {
         }
         if (sent.expired) {
           result.expired++;
-          await this.prisma.pushSubscription.delete({ where: { id: s.id } }).catch(() => {});
+          await this.prisma.pushSubscription
+            .delete({ where: { id: s.id } })
+            .catch(() => {});
           return;
         }
         result.failed++;

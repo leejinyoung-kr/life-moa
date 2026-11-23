@@ -25,7 +25,10 @@ async function bootstrap() {
   const trustProxy = env.TRUST_PROXY;
   if (trustProxy) {
     // 숫자(홉 수) 또는 'true'/CIDR 문자열 허용
-    app.set('trust proxy', /^\d+$/.test(trustProxy) ? Number(trustProxy) : trustProxy);
+    app.set(
+      'trust proxy',
+      /^\d+$/.test(trustProxy) ? Number(trustProxy) : trustProxy,
+    );
   }
   // 보안 헤더 — CSP/HSTS/X-Frame-Options 등. API+Swagger UI(api-docs) 호환을 위해
   // script/style 은 'unsafe-inline' 허용, 그 외는 'self' 로 제한
@@ -73,4 +76,4 @@ async function bootstrap() {
 
   await app.listen(env.PORT);
 }
-bootstrap();
+void bootstrap();

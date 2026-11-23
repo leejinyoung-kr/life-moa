@@ -1,5 +1,10 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { StorageService } from '@leejinyoung-kr/core-storage';
+import type { StorageFile } from '@prisma/client';
 import { createHash, randomUUID } from 'crypto';
 import { Readable, type Writable } from 'stream';
 import type { ReadableStream as WebReadableStream } from 'stream/web';
@@ -8,8 +13,18 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NotificationService } from '../notification/notification.service';
 import { CreateFolderDto, MoveFileDto } from './dto/file.dto';
 import { SystemLogService } from '../system-log/system-log.service';
-import { folderPath, subtreeIds, zipPaths, type FolderNode } from './file-path.util';
-import { decodeText, isTextPreviewable, TEXT_PREVIEW_MAX_BYTES, trimPartialUtf8 } from './file-text.util';
+import {
+  folderPath,
+  subtreeIds,
+  zipPaths,
+  type FolderNode,
+} from './file-path.util';
+import {
+  decodeText,
+  isTextPreviewable,
+  TEXT_PREVIEW_MAX_BYTES,
+  trimPartialUtf8,
+} from './file-text.util';
 
 // 전체 검색 결과 상한 (폴더·파일 각각)
 const SEARCH_LIMIT = 200;
@@ -45,12 +60,27 @@ export class FileService {
   async list(userId: number, folderId?: number) {
     const [folders, files, usage, ancestors] = await Promise.all([
       this.prisma.storageFolder.findMany({
-        where: { user_id: userId, parent_id: folderId ?? null, deleted_at: null },
+        where: {
+          user_id: userId,
+          parent_id: folderId ?? null,
+          deleted_at: null,
+        },
         orderBy: { created_at: 'asc' },
-        include: { _count: { select: { files: { where: { deleted_at: null } }, children: { where: { deleted_at: null } } } } },
+        include: {
+          _count: {
+            select: {
+              files: { where: { deleted_at: null } },
+              children: { where: { deleted_at: null } },
+            },
+          },
+        },
       }),
       this.prisma.storageFile.findMany({
-        where: { user_id: userId, folder_id: folderId ?? null, deleted_at: null },
+        where: {
+          user_id: userId,
+          folder_id: folderId ?? null,
+          deleted_at: null,
+        },
         orderBy: { created_at: 'desc' },
       }),
       this.prisma.storageFile.aggregate({
@@ -100,19 +130,29 @@ export class FileService {
     ]);
     const byId = new Map<number, FolderNode>(allFolders.map((f) => [f.id, f]));
     const lower = q.toLowerCase();
-    const matched = allFolders.filter((f) => f.name.normalize('NFC').toLowerCase().includes(lower));
+    const matched = allFolders.filter((f) =>
+      f.name.normalize('NFC').toLowerCase().includes(lower),
+    );
     const folders = matched.slice(0, SEARCH_LIMIT);
 
     const fileCounts = folders.length
       ? await this.prisma.storageFile.groupBy({
-        by: ['folder_id'],
-        where: { user_id: userId, deleted_at: null, folder_id: { in: folders.map((f) => f.id) } },
-        _count: { _all: true },
-      })
+          by: ['folder_id'],
+          where: {
+            user_id: userId,
+            deleted_at: null,
+            folder_id: { in: folders.map((f) => f.id) },
+          },
+          _count: { _all: true },
+        })
       : [];
-    const fileCountOf = new Map(fileCounts.map((c) => [c.folder_id, c._count._all]));
+    const fileCountOf = new Map(
+      fileCounts.map((c) => [c.folder_id, c._count._all]),
+    );
     const childCountOf = new Map<number, number>();
-    for (const f of allFolders) if (f.parent_id !== null) childCountOf.set(f.parent_id, (childCountOf.get(f.parent_id) ?? 0) + 1);
+    for (const f of allFolders)
+      if (f.parent_id !== null)
+        childCountOf.set(f.parent_id, (childCountOf.get(f.parent_id) ?? 0) + 1);
 
     return {
       folders: folders.map((f) => ({
@@ -146,10 +186,18 @@ export class FileService {
     });
     const scope = folderId ? [...subtreeIds(folders, folderId)] : null;
     const files = await this.prisma.storageFile.findMany({
-      where: { user_id: userId, deleted_at: null, ...(scope ? { folder_id: { in: scope } } : {}) },
+      where: {
+        user_id: userId,
+        deleted_at: null,
+        ...(scope ? { folder_id: { in: scope } } : {}),
+      },
       orderBy: { created_at: 'asc' },
     });
-    const paths = zipPaths(new Map(folders.map((f) => [f.id, f])), folderId ?? null, files);
+    const paths = zipPaths(
+      new Map(folders.map((f) => [f.id, f])),
+      folderId ?? null,
+      files,
+    );
 
     return {
       rootName: root?.name ?? null,
@@ -166,7 +214,11 @@ export class FileService {
 
   // ZIP 을 바로 흘려보낸다 — B2 오브젝트를 하나씩 받아 압축해 넘기므로 서버 메모리에 쌓이지 않는다.
   // 받는 쪽이 끊으면 남은 파일은 받지 않고 멈춘다
-  async streamZip(userId: number, entries: ZipEntry[], out: Writable): Promise<void> {
+  async streamZip(
+    userId: number,
+    entries: ZipEntry[],
+    out: Writable,
+  ): Promise<void> {
     // archiver 8 은 ESM 전용이라 쓸 때만 불러온다 (jest 가 모듈을 읽다 깨지지 않게)
     const { ZipArchive } = await import('archiver');
     const archive = new ZipArchive({ zlib: { level: 6 } });
@@ -175,22 +227,33 @@ export class FileService {
       closed = true;
       archive.abort();
     });
-    const failed = new Promise<never>((_, reject) => archive.on('error', reject));
+    const failed = new Promise<never>((_, reject) =>
+      archive.on('error', reject),
+    );
     failed.catch(() => undefined);
     archive.pipe(out);
 
     try {
       for (const e of entries) {
         if (closed) return;
-        const url = await this.storage.getDownloadUrl(e.objectKey, e.name, e.mimeType, 'attachment');
+        const url = await this.storage.getDownloadUrl(
+          e.objectKey,
+          e.name,
+          e.mimeType,
+          'attachment',
+        );
         const res = await fetch(url);
-        if (!res.ok || !res.body) throw new Error(`스토리지 응답 ${res.status} (${e.path})`);
+        if (!res.ok || !res.body)
+          throw new Error(`스토리지 응답 ${res.status} (${e.path})`);
         const added = new Promise((resolve) => archive.once('entry', resolve));
-        archive.append(Readable.fromWeb(res.body as WebReadableStream<Uint8Array>), {
-          name: e.path,
-          date: e.createdAt,
-          store: isPrecompressed(e.mimeType),
-        });
+        archive.append(
+          Readable.fromWeb(res.body as WebReadableStream<Uint8Array>),
+          {
+            name: e.path,
+            date: e.createdAt,
+            store: isPrecompressed(e.mimeType),
+          },
+        );
         await Promise.race([added, failed]);
       }
       if (!closed) await Promise.race([archive.finalize(), failed]);
@@ -212,7 +275,9 @@ export class FileService {
       throw new BadRequestException('받을 파일이 없습니다.');
     }
     if (plan.totalBytes > ZIP_MAX_BYTES) {
-      throw new BadRequestException('한 번에 받을 수 있는 용량(2GB)을 넘습니다. 하위 폴더별로 나눠 받으세요.');
+      throw new BadRequestException(
+        '한 번에 받을 수 있는 용량(2GB)을 넘습니다. 하위 폴더별로 나눠 받으세요.',
+      );
     }
   }
 
@@ -222,7 +287,12 @@ export class FileService {
     let currentId: number | null = folderId;
 
     while (currentId !== null) {
-      const folder = await this.prisma.storageFolder.findFirst({
+      // 반복마다 currentId 를 folder 에서 다시 받아 TS 가 타입을 못 정한다(any) — 쓰는 칸만 적어 둔다
+      const folder: {
+        id: number;
+        name: string;
+        parent_id: number | null;
+      } | null = await this.prisma.storageFolder.findFirst({
         where: { id: currentId, user_id: userId, deleted_at: null },
       });
       if (!folder) break;
@@ -237,25 +307,38 @@ export class FileService {
   private async assertQuota(userId: number, incoming: number): Promise<void> {
     if (!env.STORAGE_QUOTA_MB) return;
     const limit = env.STORAGE_QUOTA_MB * 1024 * 1024;
-    const used = await this.prisma.storageFile.aggregate({ where: { user_id: userId, deleted_at: null }, _sum: { size: true } });
+    const used = await this.prisma.storageFile.aggregate({
+      where: { user_id: userId, deleted_at: null },
+      _sum: { size: true },
+    });
     if (Number(used._sum.size ?? 0) + incoming > limit) {
-      throw new BadRequestException(`저장 한도(${env.STORAGE_QUOTA_MB}MB)를 넘습니다. 파일을 지우고 다시 올리세요.`);
+      throw new BadRequestException(
+        `저장 한도(${env.STORAGE_QUOTA_MB}MB)를 넘습니다. 파일을 지우고 다시 올리세요.`,
+      );
     }
   }
 
   // 파일 업로드 — MIME 화이트리스트 검증 + SHA-256 중복 제거 후 B2 저장·DB 기록.
   // 동일 내용(해시 일치) 파일이 이미 있으면 B2 재업로드 없이 기존 오브젝트를 가리키는 메타만 추가한다.
   // relDir 가 있으면(폴더째 업로드) folderId 아래에 그 경로의 폴더를 찾거나 만들어 그 안에 넣는다
-  async upload(userId: number, file: Express.Multer.File, folderId?: number, relDir?: string) {
+  async upload(
+    userId: number,
+    file: Express.Multer.File,
+    folderId?: number,
+    relDir?: string,
+  ) {
     this.storage.validateUpload(file);
     await this.assertQuota(userId, file.size);
 
     if (folderId) await this.findOwnedFolder(userId, folderId);
-    if (relDir) folderId = await this.ensureFolderPath(userId, folderId ?? null, relDir);
+    if (relDir)
+      folderId = await this.ensureFolderPath(userId, folderId ?? null, relDir);
 
     // multer가 원본 파일명을 latin1로 디코딩하므로 한글 등 비ASCII 파일명은 utf8로 재해석.
     // NFC 정규화는 맥에서 올린 이름(NFD, 자모 분리) 대비 — 저장 형태가 갈리면 목록 검색(name.includes)이 못 찾는다
-    const originalName = Buffer.from(file.originalname, 'latin1').toString('utf8').normalize('NFC');
+    const originalName = Buffer.from(file.originalname, 'latin1')
+      .toString('utf8')
+      .normalize('NFC');
     const hash = createHash('sha256').update(file.buffer).digest('hex');
 
     // 동일 내용 파일이 이미 있으면 그 오브젝트 키를 재사용 (B2 업로드/저장 비용 절감)
@@ -263,13 +346,15 @@ export class FileService {
       where: { user_id: userId, hash, deleted_at: null },
     });
     const ext = originalName.split('.').pop() ?? '';
-    const objectKey = dup?.object_key ?? `users/${userId}/${randomUUID()}${ext ? '.' + ext : ''}`;
+    const objectKey =
+      dup?.object_key ??
+      `users/${userId}/${randomUUID()}${ext ? '.' + ext : ''}`;
 
     if (!dup) {
       await this.storage.putObject(objectKey, file.buffer, file.mimetype);
     }
 
-    let saved;
+    let saved: StorageFile;
     try {
       saved = await this.prisma.storageFile.create({
         data: {
@@ -286,7 +371,16 @@ export class FileService {
       // DB 기록 실패 시 방금 올린 B2 오브젝트 보상삭제 (dup 재사용분은 보존)
       if (!dup) {
         await this.storage.deleteObject(objectKey).catch((e2: unknown) => {
-          this.sysLog.error({ userId, category: 'file', message: `DB 저장 실패 후 B2 보상삭제도 실패 — key: ${objectKey}`, metadata: { objectKey, dbError: (e as Error).message, b2Error: (e2 as Error).message } });
+          this.sysLog.error({
+            userId,
+            category: 'file',
+            message: `DB 저장 실패 후 B2 보상삭제도 실패 — key: ${objectKey}`,
+            metadata: {
+              objectKey,
+              dbError: (e as Error).message,
+              b2Error: (e2 as Error).message,
+            },
+          });
         });
       }
       throw e;
@@ -306,7 +400,10 @@ export class FileService {
   }
 
   // 설정(notif_upload)이 켜진 사용자에게만 업로드 완료 알림 생성 + 푸시. 알림 실패가 업로드 자체를 막지 않도록 격리
-  private async notifyUploadComplete(userId: number, fileName: string): Promise<void> {
+  private async notifyUploadComplete(
+    userId: number,
+    fileName: string,
+  ): Promise<void> {
     try {
       const settings = await this.prisma.userSettings.findUnique({
         where: { user_id: userId },
@@ -316,8 +413,11 @@ export class FileService {
       await this.notification.createWithPush(
         userId,
         {
-          group: 'system', tone: 'info',
-          title: `${fileName} 업로드 완료`, description: '파일 보관함에 업로드가 완료됐습니다.', source: '파일 보관함',
+          group: 'system',
+          tone: 'info',
+          title: `${fileName} 업로드 완료`,
+          description: '파일 보관함에 업로드가 완료됐습니다.',
+          source: '파일 보관함',
         },
         { url: '/files' },
       );
@@ -330,22 +430,40 @@ export class FileService {
   // disposition: 'attachment'면 다운로드, 'inline'이면 브라우저 내 미리보기
   // text/html·image/svg+xml 등 inline 렌더링 시 XSS 위험이 있는 형식은 attachment 로 강제 전환
   // 파일명은 core-storage 가 filename*(UTF-8, NFC) + ASCII 대체 이름으로 싣는다 — 프론트의 a.download 는 B2 가 다른 origin 이라 무시된다
-  async getDownloadUrl(userId: number, fileId: number, disposition: 'attachment' | 'inline' = 'attachment') {
+  async getDownloadUrl(
+    userId: number,
+    fileId: number,
+    disposition: 'attachment' | 'inline' = 'attachment',
+  ) {
     const file = await this.findOwnedFile(userId, fileId);
-    const url = await this.storage.getDownloadUrl(file.object_key, file.name, file.mime_type, disposition);
+    const url = await this.storage.getDownloadUrl(
+      file.object_key,
+      file.name,
+      file.mime_type,
+      disposition,
+    );
     return { url };
   }
 
   // 텍스트 미리보기 — 스토리지에서 앞부분(최대 512KB)만 받아 글자로 돌려준다.
   // 브라우저가 B2 주소를 직접 읽으면 다른 origin(CORS)이고 한글 인코딩도 보장되지 않아 서버에서 읽는다
-  async previewText(userId: number, fileId: number): Promise<{ text: string; truncated: boolean }> {
+  async previewText(
+    userId: number,
+    fileId: number,
+  ): Promise<{ text: string; truncated: boolean }> {
     const file = await this.findOwnedFile(userId, fileId);
     if (!isTextPreviewable(file.mime_type, file.name)) {
       throw new BadRequestException('글자로 미리 볼 수 없는 형식입니다.');
     }
-    const url = await this.storage.getDownloadUrl(file.object_key, file.name, file.mime_type, 'attachment');
+    const url = await this.storage.getDownloadUrl(
+      file.object_key,
+      file.name,
+      file.mime_type,
+      'attachment',
+    );
     const res = await fetch(url);
-    if (!res.ok || !res.body) throw new BadRequestException('파일을 읽지 못했습니다.');
+    if (!res.ok || !res.body)
+      throw new BadRequestException('파일을 읽지 못했습니다.');
     const reader = res.body.getReader();
     const chunks: Uint8Array[] = [];
     let size = 0;
@@ -356,14 +474,18 @@ export class FileService {
       chunks.push(value);
       size += value.byteLength;
       if (size >= TEXT_PREVIEW_MAX_BYTES) {
-        truncated = size > TEXT_PREVIEW_MAX_BYTES || file.size > TEXT_PREVIEW_MAX_BYTES;
+        truncated =
+          size > TEXT_PREVIEW_MAX_BYTES || file.size > TEXT_PREVIEW_MAX_BYTES;
         await reader.cancel();
         break;
       }
     }
     const buf = Buffer.concat(chunks).subarray(0, TEXT_PREVIEW_MAX_BYTES);
     // 잘라 낸 끝이 한글 글자 중간이면 UTF-8 판정이 깨지므로, 잘랐을 때는 끝의 불완전한 바이트를 떼고 읽는다
-    return { text: decodeText(truncated ? trimPartialUtf8(buf) : buf), truncated };
+    return {
+      text: decodeText(truncated ? trimPartialUtf8(buf) : buf),
+      truncated,
+    };
   }
 
   // 파일 삭제 — DB soft delete. 동일 오브젝트를 가리키는 다른 파일(중복제거 공유)이 없을 때만 B2 오브젝트 삭제
@@ -401,12 +523,23 @@ export class FileService {
 
   // "보험/2026" 같은 상대 경로를 parentId 아래에 한 칸씩 찾거나 만들고 마지막 폴더 id 를 돌려준다 (폴더째 업로드용).
   // 같은 이름 폴더가 이미 있으면 그 폴더를 쓴다 — 업로드는 프론트가 한 파일씩 차례로 보내므로 동시에 같은 폴더를 만들 일은 없다
-  async ensureFolderPath(userId: number, parentId: number | null, relDir: string): Promise<number | undefined> {
-    const segments = relDir.split('/').map((s) => s.normalize('NFC').trim()).filter(Boolean);
-    if (segments.length > MAX_FOLDER_DEPTH) throw new BadRequestException(`폴더는 ${MAX_FOLDER_DEPTH}단계까지만 올릴 수 있습니다.`);
+  async ensureFolderPath(
+    userId: number,
+    parentId: number | null,
+    relDir: string,
+  ): Promise<number | undefined> {
+    const segments = relDir
+      .split('/')
+      .map((s) => s.normalize('NFC').trim())
+      .filter(Boolean);
+    if (segments.length > MAX_FOLDER_DEPTH)
+      throw new BadRequestException(
+        `폴더는 ${MAX_FOLDER_DEPTH}단계까지만 올릴 수 있습니다.`,
+      );
     let current = parentId;
     for (const name of segments) {
-      if (name.length > 200) throw new BadRequestException('폴더 이름이 너무 깁니다 (200자).');
+      if (name.length > 200)
+        throw new BadRequestException('폴더 이름이 너무 깁니다 (200자).');
       const found = await this.prisma.storageFolder.findFirst({
         where: { user_id: userId, parent_id: current, name, deleted_at: null },
         orderBy: { id: 'asc' },
@@ -414,7 +547,12 @@ export class FileService {
       });
       current = found
         ? found.id
-        : (await this.prisma.storageFolder.create({ data: { user_id: userId, parent_id: current, name }, select: { id: true } })).id;
+        : (
+            await this.prisma.storageFolder.create({
+              data: { user_id: userId, parent_id: current, name },
+              select: { id: true },
+            })
+          ).id;
     }
     return current ?? undefined;
   }
@@ -459,7 +597,11 @@ export class FileService {
     });
     const scope = folderId ? subtreeIds(folders, folderId) : null;
     const files = await this.prisma.storageFile.findMany({
-      where: { user_id: userId, deleted_at: null, ...(scope ? { folder_id: { in: [...scope] } } : {}) },
+      where: {
+        user_id: userId,
+        deleted_at: null,
+        ...(scope ? { folder_id: { in: [...scope] } } : {}),
+      },
       select: { id: true, folder_id: true, object_key: true, size: true },
     });
     // 비우는 폴더 자신은 남기고 그 아래만 지운다
@@ -485,16 +627,30 @@ export class FileService {
         data: { deleted_at: now },
       }),
       this.prisma.storageFolder.updateMany({
-        where: { user_id: userId, id: { in: plan.folderIds }, deleted_at: null },
+        where: {
+          user_id: userId,
+          id: { in: plan.folderIds },
+          deleted_at: null,
+        },
         data: { deleted_at: now },
       }),
     ]);
-    const purged = await this.deleteUnreferencedObjects(userId, plan.objectKeys);
-    return { deletedFiles: plan.fileIds.length, deletedFolders: plan.folderIds.length, purgedObjects: purged };
+    const purged = await this.deleteUnreferencedObjects(
+      userId,
+      plan.objectKeys,
+    );
+    return {
+      deletedFiles: plan.fileIds.length,
+      deletedFolders: plan.folderIds.length,
+      purgedObjects: purged,
+    };
   }
 
   // 남은(미삭제) 파일이 하나도 가리키지 않는 오브젝트만 B2 에서 지운다 — 하나가 실패해도 나머지는 계속, 실패는 시스템 로그로
-  private async deleteUnreferencedObjects(userId: number, keys: string[]): Promise<number> {
+  private async deleteUnreferencedObjects(
+    userId: number,
+    keys: string[],
+  ): Promise<number> {
     const unique = [...new Set(keys)];
     if (unique.length === 0) return 0;
     const live = await this.prisma.storageFile.findMany({
@@ -509,14 +665,22 @@ export class FileService {
         await this.storage.deleteObject(key);
         purged++;
       } catch (e) {
-        this.sysLog.error({ userId, category: 'file', message: `삭제 후 B2 오브젝트 삭제 실패 — key: ${key}`, metadata: { objectKey: key, error: (e as Error).message } });
+        this.sysLog.error({
+          userId,
+          category: 'file',
+          message: `삭제 후 B2 오브젝트 삭제 실패 — key: ${key}`,
+          metadata: { objectKey: key, error: (e as Error).message },
+        });
       }
     }
     return purged;
   }
 
   // 사용자 폴더를 한 번에 읽어 하위 폴더 id 를 메모리에서 모은 뒤, 폴더·파일 soft delete를 단일 트랜잭션으로 일괄 처리. 지운 파일들의 오브젝트 키를 돌려준다
-  private async deleteFolderRecursive(userId: number, folderId: number): Promise<string[]> {
+  private async deleteFolderRecursive(
+    userId: number,
+    folderId: number,
+  ): Promise<string[]> {
     // 폴더마다 하위 폴더를 조회하면 폴더 수만큼 쿼리가 나간다(N+1) — planZip · planClear 와 같은 방식
     const folders = await this.prisma.storageFolder.findMany({
       where: { user_id: userId, deleted_at: null },

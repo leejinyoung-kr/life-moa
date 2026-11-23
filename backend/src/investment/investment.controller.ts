@@ -63,7 +63,10 @@ export class InvestmentController {
 
   // 시세조회 — 등록된 종목코드/티커로 현재가 조회 (국내: 네이버, 해외: 야후+환율)
   @Get(':id/price')
-  lookupPrice(@CurrentUser() user: AuthUser, @Param('id', ParseIntPipe) id: number) {
+  lookupPrice(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
     return this.service.lookupPrice(user.id, id);
   }
 

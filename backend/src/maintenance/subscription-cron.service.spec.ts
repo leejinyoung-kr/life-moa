@@ -8,15 +8,28 @@ describe('SubscriptionCronService.rollForwardPastDue', () => {
   let txs: any[];
   let prisma: any;
   let priceLookup: { getExchangeRate: jest.Mock };
-  const svc = () => new SubscriptionCronService(prisma, priceLookup as unknown as PriceLookupService);
+  const svc = () =>
+    new SubscriptionCronService(
+      prisma,
+      priceLookup as unknown as PriceLookupService,
+    );
   const d = (s: string) => new Date(`${s}T00:00:00Z`);
 
   function sub(over: Record<string, any> = {}) {
     const { amount, ...rest } = over;
     subs.push({
-      id: subs.length + 1, user_id: 1, name: '유튜브 프리미엄', currency: 'KRW', pay_method: 'shinhan_card',
-      auto_ledger: true, cycle: 'monthly', status: 'active', next_payment_date: d('2026-10-21'), billing_day: 21,
-      created_at: new Date('2026-01-01T00:00:00Z'), deleted_at: null,
+      id: subs.length + 1,
+      user_id: 1,
+      name: '유튜브 프리미엄',
+      currency: 'KRW',
+      pay_method: 'shinhan_card',
+      auto_ledger: true,
+      cycle: 'monthly',
+      status: 'active',
+      next_payment_date: d('2026-10-21'),
+      billing_day: 21,
+      created_at: new Date('2026-01-01T00:00:00Z'),
+      deleted_at: null,
       ...rest,
       amount: new Prisma.Decimal(amount ?? 14900),
     });
@@ -31,13 +44,32 @@ describe('SubscriptionCronService.rollForwardPastDue', () => {
     prisma = {
       subscription: {
         findMany: jest.fn(async ({ where }: any) =>
-          subs.filter((s) => s.deleted_at == null && s.status !== 'paused' && s.next_payment_date < where.next_payment_date.lt)),
-        update: jest.fn(async ({ where, data }: any) => Object.assign(subs.find((s) => s.id === where.id), data)),
+          subs.filter(
+            (s) =>
+              s.deleted_at == null &&
+              s.status !== 'paused' &&
+              s.next_payment_date < where.next_payment_date.lt,
+          ),
+        ),
+        update: jest.fn(async ({ where, data }: any) =>
+          Object.assign(
+            subs.find((s) => s.id === where.id),
+            data,
+          ),
+        ),
       },
       transaction: {
         findMany: jest.fn(async ({ where }: any) =>
-          txs.filter((t) => t.subscription_id === where.subscription_id && where.date.in.some((x: Date) => x.getTime() === t.date.getTime()))),
-        createMany: jest.fn(async ({ data }: any) => { txs.push(...data); return { count: data.length }; }),
+          txs.filter(
+            (t) =>
+              t.subscription_id === where.subscription_id &&
+              where.date.in.some((x: Date) => x.getTime() === t.date.getTime()),
+          ),
+        ),
+        createMany: jest.fn(async ({ data }: any) => {
+          txs.push(...data);
+          return { count: data.length };
+        }),
       },
       $transaction: jest.fn(async (fn: any) => fn(prisma)),
     };
@@ -48,10 +80,18 @@ describe('SubscriptionCronService.rollForwardPastDue', () => {
     sub();
     const res = await svc().rollForwardPastDue();
 
-    expect(txs).toEqual([expect.objectContaining({
-      user_id: 1, type: 'expense', date: d('2026-10-21'), title: '유튜브 프리미엄', category: 'insurance_subscription',
-      pay_method: 'shinhan_card', memo: null, subscription_id: 1,
-    })]);
+    expect(txs).toEqual([
+      expect.objectContaining({
+        user_id: 1,
+        type: 'expense',
+        date: d('2026-10-21'),
+        title: '유튜브 프리미엄',
+        category: 'insurance_subscription',
+        pay_method: 'shinhan_card',
+        memo: null,
+        subscription_id: 1,
+      }),
+    ]);
     expect(txs[0].amount.toNumber()).toBe(14900);
     expect(subs[0].next_payment_date).toEqual(d('2026-11-21'));
     expect(res).toBe('구독 결제일 1건 갱신 · 가계부 1건 추가');
@@ -66,7 +106,11 @@ describe('SubscriptionCronService.rollForwardPastDue', () => {
 
   it('이미 만든 결제일(지운 내역 포함)은 다시 만들지 않는다', async () => {
     sub();
-    txs.push({ subscription_id: 1, date: d('2026-10-21'), deleted_at: new Date() });
+    txs.push({
+      subscription_id: 1,
+      date: d('2026-10-21'),
+      deleted_at: new Date(),
+    });
     await svc().rollForwardPastDue();
     expect(prisma.transaction.createMany).not.toHaveBeenCalled();
     expect(subs[0].next_payment_date).toEqual(d('2026-11-21'));
@@ -93,7 +137,9 @@ describe('SubscriptionCronService.rollForwardPastDue', () => {
     sub();
     sub({ name: 'ChatGPT', currency: 'USD', amount: 20 });
 
-    await expect(svc().rollForwardPastDue()).rejects.toThrow('USD 구독 1건은 내일 다시');
+    await expect(svc().rollForwardPastDue()).rejects.toThrow(
+      'USD 구독 1건은 내일 다시',
+    );
     expect(txs).toHaveLength(1);
     expect(subs[0].next_payment_date).toEqual(d('2026-11-21'));
     expect(subs[1].next_payment_date).toEqual(d('2026-10-21'));

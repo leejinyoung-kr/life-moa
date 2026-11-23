@@ -86,9 +86,9 @@ describe('CryptoAuditService — 점검·재암호화', () => {
       stale: 3,
       failures: [],
     });
-    expect(
-      before.find((r) => r.label === 'credential.totp_enc'),
-    ).toMatchObject({ byKey: { k2609: 1 }, stale: 1 });
+    expect(before.find((r) => r.label === 'credential.totp_enc')).toMatchObject(
+      { byKey: { k2609: 1 }, stale: 1 },
+    );
 
     const results = await audit.reencrypt();
     expect(results.reduce((n, r) => n + r.converted, 0)).toBe(4);

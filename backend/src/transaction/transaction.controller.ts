@@ -59,7 +59,8 @@ export class TransactionController {
   ): Promise<void> {
     const filename = encodeURIComponent('가계부.xlsx');
     res.set({
-      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Type':
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'Content-Disposition': `attachment; filename="transactions.xlsx"; filename*=UTF-8''${filename}`,
     });
     // WorkbookWriter 가 res 스트림에 직접 쓰고 commit 시 응답을 종료한다

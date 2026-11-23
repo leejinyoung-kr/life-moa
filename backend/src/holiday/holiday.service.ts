@@ -15,6 +15,11 @@ interface SpcdeItem {
   isHoliday: 'Y' | 'N';
 }
 
+// getRestDeInfo JSON 응답 — item 은 1건이면 객체, 여러 건이면 배열, 0건이면 items 가 빈 문자열
+interface SpcdeResponse {
+  response?: { body?: { items?: { item?: SpcdeItem | SpcdeItem[] } } };
+}
+
 @Injectable()
 export class HolidayService {
   private readonly logger = new Logger(HolidayService.name);
@@ -24,18 +29,25 @@ export class HolidayService {
   // 조회 범위(연도가 걸쳐도 됨)에 해당하는 공휴일 목록 — 연도별 캐시 우선, 없으면 외부 API에서 가져와 캐싱
   async getForRange(range: { gte: Date; lt: Date }): Promise<HolidayDto[]> {
     const years: number[] = [];
-    for (let y = range.gte.getUTCFullYear(); y <= range.lt.getUTCFullYear(); y++) years.push(y);
+    for (
+      let y = range.gte.getUTCFullYear();
+      y <= range.lt.getUTCFullYear();
+      y++
+    )
+      years.push(y);
     const lists = await Promise.all(years.map((y) => this.getForYear(y)));
-    return lists
-      .flat()
-      .filter((h) => h.date >= range.gte && h.date < range.lt);
+    return lists.flat().filter((h) => h.date >= range.gte && h.date < range.lt);
   }
 
   // 연도별 공휴일 조회 — DB 캐시가 있으면 그대로, 없으면 API에서 가져와 캐싱 후 반환
   async getForYear(year: number): Promise<HolidayDto[]> {
     const cached = await this.prisma.holiday.findMany({ where: { year } });
     if (cached.length) {
-      return cached.map((h) => ({ date: h.date, name: h.name, isSubstitute: h.is_substitute }));
+      return cached.map((h) => ({
+        date: h.date,
+        name: h.name,
+        isSubstitute: h.is_substitute,
+      }));
     }
     return this.fetchAndCache(year);
   }
@@ -64,11 +76,14 @@ export class HolidayService {
     }
   }
 
-  private async fetchFromApi(year: number, apiKey: string): Promise<HolidayDto[]> {
+  private async fetchFromApi(
+    year: number,
+    apiKey: string,
+  ): Promise<HolidayDto[]> {
     const url = `https://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/getRestDeInfo?solYear=${year}&ServiceKey=${apiKey}&_type=json&numOfRows=100`;
     const res = await fetch(url);
     if (!res.ok) return [];
-    const json = await res.json();
+    const json = (await res.json()) as SpcdeResponse | null;
     const raw = json?.response?.body?.items?.item;
     const list: SpcdeItem[] = Array.isArray(raw) ? raw : raw ? [raw] : [];
     return list.map((it) => ({

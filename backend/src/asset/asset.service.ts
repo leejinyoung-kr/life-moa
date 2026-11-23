@@ -23,13 +23,21 @@ export class AssetService {
 
   // 현금 흐름 합계(수입 - 지출 - 자산이동) — dateFilter 지정 시 해당 구간만. 월말 스냅샷 저장·실시간 델타 계산에 공용 사용
   // 자산이동은 예적금 잔액·투자 예수금으로 옮겨 가 그쪽에서 세므로 현금에서 뺀다(가계부 잔액과 같은 식)
-  private async cashFlowSum(userId: number, dateFilter?: Prisma.DateTimeFilter): Promise<number> {
+  private async cashFlowSum(
+    userId: number,
+    dateFilter?: Prisma.DateTimeFilter,
+  ): Promise<number> {
     const rows = await this.prisma.transaction.groupBy({
       by: ['type'],
-      where: { user_id: userId, deleted_at: null, ...(dateFilter ? { date: dateFilter } : {}) },
+      where: {
+        user_id: userId,
+        deleted_at: null,
+        ...(dateFilter ? { date: dateFilter } : {}),
+      },
       _sum: { amount: true },
     });
-    const sumOf = (type: TransactionType) => rows.find((r) => r.type === type)?._sum.amount?.toNumber() ?? 0;
+    const sumOf = (type: TransactionType) =>
+      rows.find((r) => r.type === type)?._sum.amount?.toNumber() ?? 0;
     return sumOf('income') - sumOf('expense') - sumOf('transfer');
   }
 
@@ -67,23 +75,37 @@ export class AssetService {
     const cashTotal =
       prevSnap?.cash_total != null
         ? prevSnap.cash_total.toNumber() +
-          (await this.cashFlowSum(userId, { gte: this.firstDayOfMonthAfter(prevSnap.month) }))
+          (await this.cashFlowSum(userId, {
+            gte: this.firstDayOfMonthAfter(prevSnap.month),
+          }))
         : await this.cashFlowSum(userId);
 
     const savingsTotal = savings.reduce((s, r) => s + r.balance.toNumber(), 0);
     const savingsAvgRate = savings.length
       ? Math.round(
-          (savings.reduce((s, r) => s + r.interest_rate.toNumber(), 0) / savings.length) * 100,
+          (savings.reduce((s, r) => s + r.interest_rate.toNumber(), 0) /
+            savings.length) *
+            100,
         ) / 100
       : null;
 
     // 달러 예수금은 환율 적용해 원화로 환산 (미투자 대기 현금도 자산이므로 합산)
-    const usdTotal = investmentAccounts.reduce((s, r) => s + r.cash_balance_usd.toNumber(), 0);
+    const usdTotal = investmentAccounts.reduce(
+      (s, r) => s + r.cash_balance_usd.toNumber(),
+      0,
+    );
     const usdToKrw = usdTotal
-      ? await this.priceLookup.getExchangeRate('USD', 'KRW').catch((e: unknown) => {
-          this.sysLog.warn({ userId, category: 'asset', message: '달러 환율 조회 실패 — 달러 자산 0원 처리', metadata: { error: (e as Error).message, usdAmount: usdTotal } });
-          return 0;
-        })
+      ? await this.priceLookup
+          .getExchangeRate('USD', 'KRW')
+          .catch((e: unknown) => {
+            this.sysLog.warn({
+              userId,
+              category: 'asset',
+              message: '달러 환율 조회 실패 — 달러 자산 0원 처리',
+              metadata: { error: (e as Error).message, usdAmount: usdTotal },
+            });
+            return 0;
+          })
       : 0;
     const investTotal =
       investments.reduce((s, r) => s + r.current_value.toNumber(), 0) +
@@ -103,14 +125,30 @@ export class AssetService {
       .map((a) => ({
         type: a.type,
         amount: a.amount,
-        percent: totalAssets > 0 ? Math.round((a.amount / totalAssets) * 100) : 0,
+        percent:
+          totalAssets > 0 ? Math.round((a.amount / totalAssets) * 100) : 0,
       }));
 
     // 유형별 카드
     const byType = [
-      { type: 'cash' as SummaryType, amount: cashTotal, count: cashTotal > 0 ? 1 : 0, avgRate: null },
-      { type: 'savings' as SummaryType, amount: savingsTotal, count: savings.length, avgRate: savingsAvgRate },
-      { type: 'investment' as SummaryType, amount: investTotal, count: investments.length, avgRate: null },
+      {
+        type: 'cash' as SummaryType,
+        amount: cashTotal,
+        count: cashTotal > 0 ? 1 : 0,
+        avgRate: null,
+      },
+      {
+        type: 'savings' as SummaryType,
+        amount: savingsTotal,
+        count: savings.length,
+        avgRate: savingsAvgRate,
+      },
+      {
+        type: 'investment' as SummaryType,
+        amount: investTotal,
+        count: investments.length,
+        avgRate: null,
+      },
     ].filter((b) => b.amount > 0 || b.count > 0);
 
     // 전월 대비 증감(직전 월말 스냅샷 기준) — 스냅샷이 없으면 null(비교 대상 없음)
@@ -118,12 +156,21 @@ export class AssetService {
     let changeAmount: number | null = null;
     let changeRate: number | null = null;
     if (prevSnap) {
-      const prevNet = prevSnap.total_assets.toNumber() - prevSnap.total_debt.toNumber();
+      const prevNet =
+        prevSnap.total_assets.toNumber() - prevSnap.total_debt.toNumber();
       changeAmount = netWorth - prevNet;
-      changeRate = prevNet !== 0 ? Math.round((changeAmount / prevNet) * 1000) / 10 : 0;
+      changeRate =
+        prevNet !== 0 ? Math.round((changeAmount / prevNet) * 1000) / 10 : 0;
     }
 
-    return { totalAssets, netWorth, changeAmount, changeRate, allocation, byType };
+    return {
+      totalAssets,
+      netWorth,
+      changeAmount,
+      changeRate,
+      allocation,
+      byType,
+    };
   }
 
   // 순자산 추이 — 지난 5개월 월말 스냅샷 + 이번 달(지금 값, 요약 숫자와 같다), 월 오름차순

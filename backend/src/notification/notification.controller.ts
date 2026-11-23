@@ -1,4 +1,14 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Put, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  ParseIntPipe,
+  Put,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '@leejinyoung-kr/core-auth';
 import { JwtAuthGuard } from '@leejinyoung-kr/core-auth';
@@ -33,7 +43,10 @@ export class NotificationController {
 
   // 단일 알림 읽음 처리
   @Put(':id/read')
-  markRead(@CurrentUser() user: AuthUser, @Param('id', ParseIntPipe) id: number) {
+  markRead(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
     return this.service.markRead(user.id, id);
   }
 

@@ -31,7 +31,9 @@ function fakeDump(exitCode: number, stdout: string, stderr = '') {
   });
   // close 는 stdout 을 다 읽은 뒤에 낸다 — 서비스가 리스너를 붙이기 전에 close 가 먼저 나면
   // 종료 코드를 놓쳐 테스트가 간헐적으로 실패한다(실제 자식 프로세스도 이 순서로 끝난다)
-  child.stdout.on('end', () => setImmediate(() => child.emit('close', exitCode)));
+  child.stdout.on('end', () =>
+    setImmediate(() => child.emit('close', exitCode)),
+  );
   setImmediate(() => {
     child.stderr.end(stderr);
     child.stdout.end(stdout);
@@ -57,31 +59,51 @@ describe('DbBackupCronService', () => {
 
   it('DATABASE_URL 을 host/port/user/password/database 로 분해한다', () => {
     const cfg = parseDbUrl('mysql://root:p%40ss@db:3306/lifemoa');
-    expect(cfg).toEqual({ host: 'db', port: '3306', user: 'root', password: 'p@ss', database: 'lifemoa' });
+    expect(cfg).toEqual({
+      host: 'db',
+      port: '3306',
+      user: 'root',
+      password: 'p@ss',
+      database: 'lifemoa',
+    });
   });
 
   it('포트 생략 시 3306 으로 기본값 처리한다', () => {
-    expect(parseDbUrl('mysql://root:secret@localhost/lifemoa').port).toBe('3306');
+    expect(parseDbUrl('mysql://root:secret@localhost/lifemoa').port).toBe(
+      '3306',
+    );
   });
 
   describe('backup', () => {
     const ctx = () => ({ signal: new AbortController().signal }) as JobContext;
 
     it('덤프를 gzip 파일로 남기고 요약을 돌려준다 — lease signal 을 mariadb-dump 에 넘긴다', async () => {
-      jest.mocked(spawn).mockImplementation(() => fakeDump(0, 'CREATE TABLE t;') as never);
+      jest
+        .mocked(spawn)
+        .mockImplementation(() => fakeDump(0, 'CREATE TABLE t;') as never);
       const c = ctx();
       const summary = await svc().backup(c);
 
       const [file] = await readdir(dir);
       expect(file).toMatch(/^lifemoa_\d{4}-\d{2}-\d{2}\.sql\.gz$/);
-      expect(gunzipSync(await readFile(join(dir, file))).toString()).toBe('CREATE TABLE t;');
-      expect(summary).toMatch(new RegExp(`^${file.replace(/\./g, '\\.')} \\(\\d+\\.\\dMB\\)$`));
+      expect(gunzipSync(await readFile(join(dir, file))).toString()).toBe(
+        'CREATE TABLE t;',
+      );
+      expect(summary).toMatch(
+        new RegExp(`^${file.replace(/\./g, '\\.')} \\(\\d+\\.\\dMB\\)$`),
+      );
       expect(jest.mocked(spawn).mock.calls[0][2]).toEqual({ signal: c.signal });
     });
 
     it('mariadb-dump 가 실패하면 쓰다 만 파일을 지우고 원본 에러(stderr)로 던진다', async () => {
-      jest.mocked(spawn).mockImplementation(() => fakeDump(2, 'partial', 'Access denied for user') as never);
-      await expect(svc().backup(ctx())).rejects.toThrow('Access denied for user');
+      jest
+        .mocked(spawn)
+        .mockImplementation(
+          () => fakeDump(2, 'partial', 'Access denied for user') as never,
+        );
+      await expect(svc().backup(ctx())).rejects.toThrow(
+        'Access denied for user',
+      );
       expect(await readdir(dir)).toEqual([]);
     });
   });

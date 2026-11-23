@@ -37,7 +37,11 @@ export class PrismaJobRunStore extends JobRunStore {
       });
       return row.id;
     } catch (e) {
-      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') return null;
+      if (
+        e instanceof Prisma.PrismaClientKnownRequestError &&
+        e.code === 'P2002'
+      )
+        return null;
       throw e;
     }
   }
@@ -69,6 +73,11 @@ export class PrismaJobRunStore extends JobRunStore {
       where: { status: 'running', lease_until: { lt: now } },
       select: { id: true, job: true, started_at: true, lease_until: true },
     });
-    return rows.map((r) => ({ id: r.id, job: r.job, startedAt: r.started_at, leaseUntil: r.lease_until }));
+    return rows.map((r) => ({
+      id: r.id,
+      job: r.job,
+      startedAt: r.started_at,
+      leaseUntil: r.lease_until,
+    }));
   }
 }

@@ -14,7 +14,9 @@ describe('assertNotDemo', () => {
   it('DEMO_MODE 이면 403 으로 막는다', () => {
     const { assertNotDemo } = load(true);
     expect(() => assertNotDemo('계정을 삭제')).toThrow(ForbiddenException);
-    expect(() => assertNotDemo('계정을 삭제')).toThrow('데모에서는 계정을 삭제할 수 없습니다.');
+    expect(() => assertNotDemo('계정을 삭제')).toThrow(
+      '데모에서는 계정을 삭제할 수 없습니다.',
+    );
   });
 
   it('운영(DEMO_MODE 아님)에서는 통과한다', () => {

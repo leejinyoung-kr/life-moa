@@ -76,7 +76,10 @@ export class CredentialController {
   // 단일 계정 조회 (목록 DTO 형태) — 보안센터 ?focus=<id> 딥링크 등에서 사용.
   // 정적 경로(template/export) 뒤에 선언해 단일 세그먼트 id 만 매칭한다.
   @Get(':id')
-  findOne(@CurrentUser() user: AuthUser, @Param('id', ParseIntPipe) id: number) {
+  findOne(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
     return this.service.findOne(user.id, id);
   }
 

@@ -1,4 +1,9 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma, TransactionFavorite } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTransactionFavoriteDto } from './dto/create-transaction-favorite.dto';
@@ -38,7 +43,13 @@ export class TransactionFavoriteService {
     const payMethod = dto.payMethod ?? '';
     const [dup, count, last] = await Promise.all([
       this.prisma.transactionFavorite.findFirst({
-        where: { user_id: userId, type: dto.type, title: dto.title, category: dto.category, pay_method: payMethod },
+        where: {
+          user_id: userId,
+          type: dto.type,
+          title: dto.title,
+          category: dto.category,
+          pay_method: payMethod,
+        },
         select: { id: true },
       }),
       this.prisma.transactionFavorite.count({ where: { user_id: userId } }),
@@ -49,7 +60,10 @@ export class TransactionFavoriteService {
       }),
     ]);
     if (dup) throw new ConflictException('이미 즐겨찾기에 있습니다.');
-    if (count >= MAX_FAVORITES) throw new BadRequestException(`즐겨찾기는 ${MAX_FAVORITES}개까지 저장할 수 있습니다.`);
+    if (count >= MAX_FAVORITES)
+      throw new BadRequestException(
+        `즐겨찾기는 ${MAX_FAVORITES}개까지 저장할 수 있습니다.`,
+      );
 
     const created = await this.prisma.transactionFavorite.create({
       data: {
@@ -68,7 +82,9 @@ export class TransactionFavoriteService {
 
   // 즐겨찾기 수정 — 바꾼 결과가 다른 즐겨찾기와 같아지면(유형·내역명·카테고리·결제수단) 거부
   async update(userId: number, id: number, dto: UpdateTransactionFavoriteDto) {
-    const current = await this.prisma.transactionFavorite.findFirst({ where: { id, user_id: userId } });
+    const current = await this.prisma.transactionFavorite.findFirst({
+      where: { id, user_id: userId },
+    });
     if (!current) throw new NotFoundException('즐겨찾기를 찾을 수 없습니다.');
     const next = {
       type: dto.type ?? current.type,
@@ -86,7 +102,8 @@ export class TransactionFavoriteService {
       where: { id },
       data: {
         ...next,
-        amount: dto.amount !== undefined ? new Prisma.Decimal(dto.amount) : undefined,
+        amount:
+          dto.amount !== undefined ? new Prisma.Decimal(dto.amount) : undefined,
         memo: dto.memo,
       },
     });
@@ -95,17 +112,27 @@ export class TransactionFavoriteService {
 
   // 표시 순서 변경 — 넘긴 id 순서대로 0,1,2… (본인 것이 아닌 id 가 섞이면 거부)
   async reorder(userId: number, ids: number[]) {
-    const owned = await this.prisma.transactionFavorite.count({ where: { user_id: userId, id: { in: ids } } });
-    if (owned !== new Set(ids).size || owned !== ids.length) throw new BadRequestException('잘못된 즐겨찾기 목록입니다.');
+    const owned = await this.prisma.transactionFavorite.count({
+      where: { user_id: userId, id: { in: ids } },
+    });
+    if (owned !== new Set(ids).size || owned !== ids.length)
+      throw new BadRequestException('잘못된 즐겨찾기 목록입니다.');
     await this.prisma.$transaction(
-      ids.map((id, i) => this.prisma.transactionFavorite.update({ where: { id }, data: { sort_order: i } })),
+      ids.map((id, i) =>
+        this.prisma.transactionFavorite.update({
+          where: { id },
+          data: { sort_order: i },
+        }),
+      ),
     );
     return this.findAll(userId);
   }
 
   // 즐겨찾기 삭제 (즐겨찾기는 원본이 아니라 바로 지운다)
   async remove(userId: number, id: number) {
-    const { count } = await this.prisma.transactionFavorite.deleteMany({ where: { id, user_id: userId } });
+    const { count } = await this.prisma.transactionFavorite.deleteMany({
+      where: { id, user_id: userId },
+    });
     if (!count) throw new NotFoundException('즐겨찾기를 찾을 수 없습니다.');
     return { id };
   }

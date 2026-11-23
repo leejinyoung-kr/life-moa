@@ -71,7 +71,12 @@ export class AuthController {
   // 프론트로 나가는 응답 계약을 지키기 위해 필요한 필드만 골라 반환한다.
   @Get('me')
   me(@CurrentUser() user: AuthUser): AuthUser {
-    return { id: user.id, email: user.email, name: user.name, picture: user.picture };
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      picture: user.picture,
+    };
   }
 
   // 계정 영구 삭제 (토큰 필요) — 전 도메인 데이터 + 사용자 제거. 되돌릴 수 없어 마스터 잠금(VaultGuard) 통과도 요구
@@ -103,10 +108,13 @@ export class AuthController {
     // 기기/IP 추출 — 신규 기기 로그인 감지용
     const fwd = req.headers['x-forwarded-for'];
     const ip = (Array.isArray(fwd) ? fwd[0] : fwd?.split(',')[0]) ?? req.ip;
-    const { access, refresh, refreshTtlMs } = await this.authService.login(req.user, {
-      ip: ip?.trim(),
-      userAgent: req.headers['user-agent'],
-    });
+    const { access, refresh, refreshTtlMs } = await this.authService.login(
+      req.user,
+      {
+        ip: ip?.trim(),
+        userAgent: req.headers['user-agent'],
+      },
+    );
     // refresh 는 httpOnly 쿠키로만, access 는 쿼리로 프론트에 전달
     res.cookie(REFRESH_COOKIE, refresh, refreshCookieOptions(refreshTtlMs));
     res.cookie(HAS_SESSION_COOKIE, '1', hasSessionCookieOptions(refreshTtlMs));
@@ -147,10 +155,11 @@ export class AuthController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const { access, refresh, refreshTtlMs } = await this.authService.verifyEmailCode(dto.email, dto.code, {
-      ip: clientIp(req),
-      userAgent: req.headers['user-agent'],
-    });
+    const { access, refresh, refreshTtlMs } =
+      await this.authService.verifyEmailCode(dto.email, dto.code, {
+        ip: clientIp(req),
+        userAgent: req.headers['user-agent'],
+      });
     res.cookie(REFRESH_COOKIE, refresh, refreshCookieOptions(refreshTtlMs));
     res.cookie(HAS_SESSION_COOKIE, '1', hasSessionCookieOptions(refreshTtlMs));
     return { token: access };
@@ -166,10 +175,13 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const token = (req.cookies?.[REFRESH_COOKIE] as string | undefined) ?? '';
-    const { access, refresh, refreshTtlMs } = await this.authService.refresh(token, {
-      ip: clientIp(req),
-      userAgent: req.headers['user-agent'],
-    });
+    const { access, refresh, refreshTtlMs } = await this.authService.refresh(
+      token,
+      {
+        ip: clientIp(req),
+        userAgent: req.headers['user-agent'],
+      },
+    );
     res.cookie(REFRESH_COOKIE, refresh, refreshCookieOptions(refreshTtlMs));
     res.cookie(HAS_SESSION_COOKIE, '1', hasSessionCookieOptions(refreshTtlMs));
     return { token: access };
@@ -178,10 +190,7 @@ export class AuthController {
   // 로그아웃 — refresh 토큰 화이트리스트 폐기 + 쿠키 제거 (access 는 클라이언트가 폐기)
   @Public()
   @Post('logout')
-  async logout(
-    @Req() req: Request,
-    @Res({ passthrough: true }) res: Response,
-  ) {
+  async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const token = (req.cookies?.[REFRESH_COOKIE] as string | undefined) ?? '';
     await this.authService.logout(token);
     res.clearCookie(REFRESH_COOKIE, {

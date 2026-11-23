@@ -27,7 +27,11 @@ export class TrashCronService {
       ['credential', () => this.prisma.credential.deleteMany({ where })],
     ];
     for (const [table, del] of simple) {
-      try { trash += (await del()).count; } catch (e) { failures.push(`${table}: ${(e as Error).message}`); }
+      try {
+        trash += (await del()).count;
+      } catch (e) {
+        failures.push(`${table}: ${(e as Error).message}`);
+      }
     }
 
     // 시스템 로그·작업 실행 기록 90일 경과분 — 실행 중인 기록은 lease 마감 대상이라 남긴다
@@ -35,29 +39,43 @@ export class TrashCronService {
     let logs = 0;
     let runs = 0;
     try {
-      logs = (await this.prisma.systemLog.deleteMany({ where: { created_at: { lt: logCutoff } } })).count;
+      logs = (
+        await this.prisma.systemLog.deleteMany({
+          where: { created_at: { lt: logCutoff } },
+        })
+      ).count;
     } catch (e) {
       failures.push(`system_log: ${(e as Error).message}`);
     }
     try {
-      runs = (await this.prisma.jobRun.deleteMany({
-        where: { started_at: { lt: logCutoff }, status: { not: 'running' } },
-      })).count;
+      runs = (
+        await this.prisma.jobRun.deleteMany({
+          where: { started_at: { lt: logCutoff }, status: { not: 'running' } },
+        })
+      ).count;
     } catch (e) {
       failures.push(`job_run: ${(e as Error).message}`);
     }
     // 끝난 알림 발송분 — 대기·발송 중인 행은 아직 나갈 것이라 남긴다
     let outbox = 0;
     try {
-      outbox = (await this.prisma.outboxMessage.deleteMany({
-        where: { created_at: { lt: logCutoff }, status: { in: ['sent', 'failed'] } },
-      })).count;
+      outbox = (
+        await this.prisma.outboxMessage.deleteMany({
+          where: {
+            created_at: { lt: logCutoff },
+            status: { in: ['sent', 'failed'] },
+          },
+        })
+      ).count;
     } catch (e) {
       failures.push(`outbox_message: ${(e as Error).message}`);
     }
 
     const summary = `휴지통 ${trash}건(30일 경과)·시스템 로그 ${logs}건·실행 기록 ${runs}건·알림 발송 ${outbox}건(90일 경과) 삭제`;
-    if (failures.length) throw new Error(`${summary} — 실패 ${failures.length}곳: ${failures.join(' / ')}`);
+    if (failures.length)
+      throw new Error(
+        `${summary} — 실패 ${failures.length}곳: ${failures.join(' / ')}`,
+      );
     return summary;
   }
 }
