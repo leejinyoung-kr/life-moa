@@ -12,19 +12,22 @@ import { qk } from '@/lib/queryKeys';
 import { won, manwon } from '@/lib/finance';
 import {
   ASSET_TYPE_COLOR, BY_TYPE_NAME, ASSET_TYPE_ORDER,
+  investmentSubText,
   type AssetType, type NetWorthSummary, type TrendPoint, type ByTypeItem,
 } from '@/lib/networth';
 
-// 자산 구성 줄을 누르면 열 가계부 탭 — 현금성 자산은 수입/지출 내역에서 나온다
-const ASSET_TYPE_TAB: Record<AssetType, string> = { cash: 'ledger', savings: 'savings', investment: 'invest' };
+// 자산 구성 줄을 누르면 열 가계부 탭 — 현금성 자산은 수입/지출 내역에서 나온다. 투자는 주식모아에서 받은 값이라 열 탭이 없다
+const ASSET_TYPE_TAB: Partial<Record<AssetType, string>> = { cash: 'ledger', savings: 'savings' };
 
-// 유형별 보조 글자 (건수 · 평균 금리)
-function typeSubText(b: ByTypeItem | undefined): string {
+// 유형별 보조 글자 (건수 · 평균 금리 · 주식모아 받은 시각)
+function typeSubText(b: ByTypeItem | undefined, summary: NetWorthSummary): string {
   if (!b) return '';
   if (b.type === 'cash') return `입출금 ${b.count}건`;
   if (b.type === 'savings') return b.avgRate !== null ? `평균 금리 ${b.avgRate}%` : `${b.count}건`;
-  return `${b.count}종목`;
+  return investmentSubText(summary.investment);
 }
+
+const ROW_CLASS = 'flex items-center gap-3 px-5 py-3 min-h-14 border-b border-border-subtle last:border-b-0';
 
 export default function NetworthPage() {
   // 순자산 데이터 (React Query 캐시)
@@ -44,7 +47,7 @@ export default function NetworthPage() {
 
   return (
     <AppShell activePath="/networth">
-      <PageHeader title="자산 종합" description="현금·예적금·투자를 합산해 순자산을 추적합니다." />
+      <PageHeader title="자산 종합" description="현금·예적금·투자를 합산해 순자산을 추적합니다. 투자는 주식모아에서 하루 한 번 받습니다." />
 
       <ErrorBanner message={error} />
 
@@ -94,22 +97,32 @@ export default function NetworthPage() {
             </div>
           </div>
           <div className="flex flex-col">
-            {rows.map((r) => (
-              <Link
-                key={r.type}
-                href={`/transactions?tab=${ASSET_TYPE_TAB[r.type]}`}
-                className="flex items-center gap-3 px-5 py-3 min-h-14 border-b border-border-subtle last:border-b-0 transition-colors hover:bg-hover"
-              >
-                <span className="w-2.5 h-2.5 shrink-0 rounded-full" style={{ background: ASSET_TYPE_COLOR[r.type] }} />
-                <span className="flex-1 min-w-0 flex flex-col leading-snug">
-                  <span className="font-medium">{BY_TYPE_NAME[r.type]}</span>
-                  <span className="text-[0.75rem] text-muted">{typeSubText(r.b)}</span>
-                </span>
-                <span className="w-11 text-right text-[0.8125rem] text-muted tabular-nums">{r.a?.percent}%</span>
-                <span className="w-32 max-md:w-auto text-right font-semibold tabular-nums">{won(r.a?.amount ?? 0)}</span>
-                <IconChevronRight className="text-muted" width={16} height={16} />
-              </Link>
-            ))}
+            {rows.map((r) => {
+              const tab = ASSET_TYPE_TAB[r.type];
+              const body = (
+                <>
+                  <span className="w-2.5 h-2.5 shrink-0 rounded-full" style={{ background: ASSET_TYPE_COLOR[r.type] }} />
+                  <span className="flex-1 min-w-0 flex flex-col leading-snug">
+                    <span className="font-medium">{BY_TYPE_NAME[r.type]}</span>
+                    <span className="text-[0.75rem] text-muted">{typeSubText(r.b, summary)}</span>
+                  </span>
+                  <span className="w-11 text-right text-[0.8125rem] text-muted tabular-nums">{r.a?.percent}%</span>
+                  <span className="w-32 max-md:w-auto text-right font-semibold tabular-nums">{won(r.a?.amount ?? 0)}</span>
+                </>
+              );
+              // 투자 줄은 누를 곳이 없다 — 화살표 자리만 비워 금액 열을 맞춘다
+              return tab ? (
+                <Link key={r.type} href={`/transactions?tab=${tab}`} className={`${ROW_CLASS} transition-colors hover:bg-hover`}>
+                  {body}
+                  <IconChevronRight className="text-muted" width={16} height={16} />
+                </Link>
+              ) : (
+                <div key={r.type} className={ROW_CLASS}>
+                  {body}
+                  <span className="w-4 shrink-0" aria-hidden />
+                </div>
+              );
+            })}
           </div>
         </Card>
       )}

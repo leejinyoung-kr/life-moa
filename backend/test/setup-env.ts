@@ -18,4 +18,7 @@ Object.assign(process.env, {
   B2_BUCKET_NAME: 'test-bucket',
   B2_BUCKET_REGION: 'us-west-004',
   B2_ENDPOINT: 'https://s3.us-west-004.backblazeb2.com',
+  // 주식모아 받기 — 테스트는 fetch 를 가짜로 바꿔 이 주소로 실제로 나가지 않는다
+  STOCKMOA_INTERNAL_URL: 'http://stockmoa.test:8040',
+  STOCKMOA_INTERNAL_TOKEN: 'test-stockmoa-internal-token-0123456789',
 });

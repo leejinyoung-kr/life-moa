@@ -2,18 +2,12 @@ import { Injectable } from '@nestjs/common';
 import { Prisma, TransactionType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { kstMonthStr } from '../common/kst-date';
-import { PriceLookupService } from '../investment/price-lookup.service';
-import { SystemLogService } from '../system-log/system-log.service';
 
 type SummaryType = 'cash' | 'savings' | 'investment';
 
 @Injectable()
 export class AssetService {
-  constructor(
-    private prisma: PrismaService,
-    private priceLookup: PriceLookupService,
-    private sysLog: SystemLogService,
-  ) {}
+  constructor(private prisma: PrismaService) {}
 
   // 'YYYY-MM' 다음달 1일 — 그 달 말까지 포함하는 배타적 상한 경계(스냅샷 컷오프)
   private firstDayOfMonthAfter(month: string): Date {
@@ -47,28 +41,22 @@ export class AssetService {
   }
 
   // 요약 — 총자산/순자산 + 전월 대비 증감 + 도넛 구성 + 유형별 집계
-  // 예적금 → Saving.balance, 투자 → Investment.current_value + 예수금, 현금 → 수입 - 지출 - 자산이동
+  // 예적금 → Saving.balance, 투자 → 주식모아에서 받은 합계(investment_summary, ADR 0011), 현금 → 수입 - 지출 - 자산이동
   async summary(userId: number) {
     // 서로 의존성 없는 조회는 한 번에 병렬 실행 (TiDB Cloud 왕복 지연 누적 방지)
-    const [savings, investments, investmentAccounts, prevSnap] =
-      await Promise.all([
-        this.prisma.saving.findMany({
-          where: { user_id: userId, deleted_at: null },
-          select: { balance: true, interest_rate: true },
-        }),
-        this.prisma.investment.findMany({
-          where: { user_id: userId, deleted_at: null },
-          select: { current_value: true },
-        }),
-        this.prisma.investmentAccount.findMany({
-          where: { user_id: userId, deleted_at: null },
-          select: { cash_balance: true, cash_balance_usd: true },
-        }),
-        this.prisma.netWorthSnapshot.findFirst({
-          where: { user_id: userId, month: { lt: kstMonthStr() } },
-          orderBy: { month: 'desc' },
-        }),
-      ]);
+    const [savings, invest, prevSnap] = await Promise.all([
+      this.prisma.saving.findMany({
+        where: { user_id: userId, deleted_at: null },
+        select: { balance: true, interest_rate: true },
+      }),
+      this.prisma.investmentSummary.findUnique({
+        where: { user_id: userId },
+      }),
+      this.prisma.netWorthSnapshot.findFirst({
+        where: { user_id: userId, month: { lt: kstMonthStr() } },
+        orderBy: { month: 'desc' },
+      }),
+    ]);
 
     // 현금 총액 = 직전 월말 스냅샷 캐시값 + 그 이후 거래 델타(전체 재집계 대신 이번 달치만 스캔).
     // 스냅샷에 캐시값이 없으면(첫 크론 이전 신규 사용자 등) 전체 재집계로 폴백.
@@ -89,28 +77,8 @@ export class AssetService {
         ) / 100
       : null;
 
-    // 달러 예수금은 환율 적용해 원화로 환산 (미투자 대기 현금도 자산이므로 합산)
-    const usdTotal = investmentAccounts.reduce(
-      (s, r) => s + r.cash_balance_usd.toNumber(),
-      0,
-    );
-    const usdToKrw = usdTotal
-      ? await this.priceLookup
-          .getExchangeRate('USD', 'KRW')
-          .catch((e: unknown) => {
-            this.sysLog.warn({
-              userId,
-              category: 'asset',
-              message: '달러 환율 조회 실패 — 달러 자산 0원 처리',
-              metadata: { error: (e as Error).message, usdAmount: usdTotal },
-            });
-            return 0;
-          })
-      : 0;
-    const investTotal =
-      investments.reduce((s, r) => s + r.current_value.toNumber(), 0) +
-      investmentAccounts.reduce((s, r) => s + r.cash_balance.toNumber(), 0) +
-      Math.round(usdTotal * usdToKrw);
+    // 투자 — 주식모아 총 평가액(종목 + 예수금, 세전). 한 번도 받지 않았으면 0
+    const investTotal = invest?.total_krw.toNumber() ?? 0;
 
     const totalAssets = cashTotal + savingsTotal + investTotal;
     const netWorth = totalAssets;
@@ -146,7 +114,7 @@ export class AssetService {
       {
         type: 'investment' as SummaryType,
         amount: investTotal,
-        count: investments.length,
+        count: invest ? 1 : 0,
         avgRate: null,
       },
     ].filter((b) => b.amount > 0 || b.count > 0);
@@ -170,6 +138,16 @@ export class AssetService {
       changeRate,
       allocation,
       byType,
+      // 투자 줄 보조 — 받은 시각 · 시세 기준 · 빠진 값. 한 번도 받지 않았으면 null
+      investment: invest
+        ? {
+            fetchedAt: invest.fetched_at,
+            quoteAt: invest.quote_at,
+            netDepositKrw: invest.net_deposit_krw.toNumber(),
+            priceMissing: invest.price_missing,
+            fxMissing: invest.fx_missing,
+          }
+        : null,
     };
   }
 

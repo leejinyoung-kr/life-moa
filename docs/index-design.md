@@ -33,7 +33,7 @@
 | --- | --- | --- |
 | `transaction_user_id_date_idx` `(user_id, date)` | 가계부 목록 `transaction/transaction.service.ts:330` · 내보내기 커서 `:622` → `user_id = ? AND deleted_at IS NULL [AND date BETWEEN ? AND ?] [AND type = ?] ORDER BY date DESC, id DESC LIMIT ?` ／ 최근 거래 월 `:285` → `user_id = ? AND deleted_at IS NULL ORDER BY date DESC LIMIT 1` ／ 대시보드 최근 5건 `dashboard/dashboard.service.ts:53` · 통합 검색 `search/search.service.ts:24`(제목 `LIKE` 는 거름만) | **필요** — 등호 `user_id` 다음이 범위·정렬 `date` 라 순서가 맞다. `deleted_at` 은 인덱스에 없어 행을 읽은 뒤 거른다 |
 | `transaction_recurring_schedule_id_idx` `(recurring_schedule_id)` | 반복 회차 생성 `transaction/transaction.service.ts:202` → `user_id = ? AND recurring_schedule_id = ?` ／ FK `ON DELETE SET NULL`(자동이체 설정 삭제 시) | **필요** (조회 + FK) |
-| `transaction_user_id_type_deleted_at_date_amount_idx` `(user_id, type, deleted_at, date, amount)` | 월별 지출 추이 `transaction/transaction.service.ts:400` → `user_id = ? AND deleted_at IS NULL AND type = 'expense' AND date >= ? AND date < ?` 의 `SUM(amount)` ／ 현금 합계 `asset/asset.service.ts:30` → `user_id = ? AND deleted_at IS NULL [AND date >= ?] GROUP BY type` 의 `SUM(amount)` ／ 대시보드 이번 달 `dashboard/dashboard.service.ts:33` · 월 요약 `transaction.service.ts:377` · 목록 합계 `:316` — 모두 `GROUP BY type` | **필요** — 아래 「복합 인덱스 순서」 참고. 월별 추이에는 딱 맞고, `GROUP BY type` 쿼리에서는 `date` 로 좁히지 못한다는 가설을 EXPLAIN ③ 으로 확인 |
+| `transaction_user_id_type_deleted_at_date_amount_idx` `(user_id, type, deleted_at, date, amount)` | 월별 지출 추이 `transaction/transaction.service.ts:400` → `user_id = ? AND deleted_at IS NULL AND type = 'expense' AND date >= ? AND date < ?` 의 `SUM(amount)` ／ 현금 합계 `asset/asset.service.ts:24` → `user_id = ? AND deleted_at IS NULL [AND date >= ?] GROUP BY type` 의 `SUM(amount)` ／ 대시보드 이번 달 `dashboard/dashboard.service.ts:33` · 월 요약 `transaction.service.ts:377` · 목록 합계 `:316` — 모두 `GROUP BY type` | **필요** — 아래 「복합 인덱스 순서」 참고. 월별 추이에는 딱 맞고, `GROUP BY type` 쿼리에서는 `date` 로 좁히지 못한다는 가설을 EXPLAIN ③ 으로 확인 |
 
 이 인덱스의 이력 (커밋 메시지 그대로): `301e11d` 2026-08-10 "[perf] 대시보드/자산 요약 조회 속도 개선" 에서 `(user_id, type, deleted_at)` → `54218e5` 2026-08-18 "[perf] 자산 요약 API 현금 총액 계산 성능 개선" 에서 `amount` 를 붙였다가 같은 커밋 안에서 `date` 를 넣은 지금 모양으로 바꿨다. schema 주석은 "cashTotal 델타 집계가 date 구간으로 좁혀 스캔되며 … 커버링 인덱스" 라고 적혀 있다.
 
@@ -42,9 +42,9 @@
 | 인덱스 | 쓰는 쿼리 | 판정 |
 | --- | --- | --- |
 | `transaction_favorite_user_id_sort_order_idx` `(user_id, sort_order)` | 목록 `transaction-favorite/transaction-favorite.service.ts:34` → `user_id = ? ORDER BY sort_order, id` ／ 맨 뒤 순서 `:56` → `user_id = ? ORDER BY sort_order DESC LIMIT 1` | **필요** — 등호 + 정렬, 순서가 맞다 |
-| `saving_user_id_idx` `(user_id)` | 목록 `saving/saving.service.ts:52` · 자산 요약 `asset/asset.service.ts:55` · 만기 알림 `maintenance/notification-cron.service.ts:83`(`maturity_date IN (...)`) · D-day `dashboard/dashboard.service.ts:173` → 전부 `user_id = ? AND deleted_at IS NULL [AND maturity_date ...]` | **필요** (조회 + FK) |
-| `investment_account_user_id_idx` `(user_id)` | 목록 `investment-account/investment-account.service.ts:116` · 자산 요약 `asset/asset.service.ts:63` · 캘린더 가상 일정 `calendar/calendar.service.ts:314` → `user_id = ? AND deleted_at IS NULL` | **필요** (조회 + FK) |
-| `investment_user_id_idx` `(user_id)` | 목록 `investment/investment.service.ts:406` · 현재가 갱신 `:129` · 자산 요약 `asset/asset.service.ts:59` → `user_id = ? AND deleted_at IS NULL [AND type ...]` | **필요** (조회 + FK) |
+| `saving_user_id_idx` `(user_id)` | 목록 `saving/saving.service.ts:52` · 자산 요약 `asset/asset.service.ts:48` · 만기 알림 `maintenance/notification-cron.service.ts:83`(`maturity_date IN (...)`) · D-day `dashboard/dashboard.service.ts:173` → 전부 `user_id = ? AND deleted_at IS NULL [AND maturity_date ...]` | **필요** (조회 + FK) |
+| `investment_account_user_id_idx` `(user_id)` | 목록 `investment-account/investment-account.service.ts:116` · 캘린더 가상 일정 `calendar/calendar.service.ts:314` → `user_id = ? AND deleted_at IS NULL` | **필요** (조회 + FK) |
+| `investment_user_id_idx` `(user_id)` | 목록 `investment/investment.service.ts:406` · 현재가 갱신 `:129` → `user_id = ? AND deleted_at IS NULL [AND type ...]` | **필요** (조회 + FK) |
 | `investment_account_id_idx` `(account_id)` | 계좌 삭제 전 보유 확인 `investment-account/investment-account.service.ts:268` → `account_id = ? AND deleted_at IS NULL` ／ 계좌별 집계 `:80` → `user_id = ? AND account_id IN (...)` | **필요** (조회 + FK cascade) |
 | `recurring_schedule_user_id_idx` `(user_id)` | 목록 `recurring-schedule/recurring-schedule.service.ts:92` · 반복거래 `transaction/transaction.service.ts:190` · 반복매수 `investment/investment.service.ts:204` · 현금흐름 예측 `dashboard/dashboard.service.ts:103` → `user_id = ? AND deleted_at IS NULL AND kind = ? [AND active = 1]` | **필요** (조회 + FK) |
 | `recurring_schedule_investment_id_idx` `(investment_id)` | 직접 `WHERE investment_id = ?` 는 없다. 반복매수의 관계 필터 `investment/investment.service.ts:204` 는 `investment.id` (PK) 쪽으로 조인 ／ FK `ON DELETE CASCADE` — 휴지통 영구삭제 `maintenance/trash-cron.service.ts:24` 가 투자를 지울 때 | **필요** (FK 용 — 조회용 근거는 약함) |
@@ -54,8 +54,14 @@
 
 | 인덱스 | 쓰는 쿼리 | 판정 |
 | --- | --- | --- |
-| `net_worth_snapshot_user_id_month_key` UNIQUE `(user_id, month)` | 월말 스냅샷 저장 `maintenance/net-worth-snapshot-cron.service.ts:40` → `upsert where user_id_month` (같은 달 두 번 저장 방지) ／ 직전 월말 `asset/asset.service.ts:67` → `user_id = ? AND month < ? ORDER BY month DESC LIMIT 1` ／ 추이 `asset/asset.service.ts:180` → 같은 조건 `LIMIT 5` | **필요** — 등호 + 범위·정렬이 같은 컬럼, 순서가 맞다 |
+| `net_worth_snapshot_user_id_month_key` UNIQUE `(user_id, month)` | 월말 스냅샷 저장 `maintenance/net-worth-snapshot-cron.service.ts:40` → `upsert where user_id_month` (같은 달 두 번 저장 방지) ／ 직전 월말 `asset/asset.service.ts:55` → `user_id = ? AND month < ? ORDER BY month DESC LIMIT 1` ／ 추이 `asset/asset.service.ts:158` → 같은 조건 `LIMIT 5` | **필요** — 등호 + 범위·정렬이 같은 컬럼, 순서가 맞다 |
 | `net_worth_snapshot_user_id_idx` `(user_id)` | `user_id` 만 쓰는 쿼리(계정 삭제 `auth/auth.service.ts:643`)도 위 UNIQUE 의 왼쪽 접두사로 탄다. FK 도 위 UNIQUE 가 만족한다 | **중복 후보** |
+
+### investment_summary (2026-11-25, ADR 0011)
+
+| 인덱스 | 쓰는 쿼리 | 판정 |
+| --- | --- | --- |
+| `investment_summary_user_id_key` UNIQUE `(user_id)` | 순자산 요약 `asset/asset.service.ts:52` → `findUnique where user_id` ／ 받기 저장 `asset/investment-summary.service.ts:79` → `upsert where user_id` (사용자당 한 행). 부팅 때 가장 최근 받은 시각(`maintenance/investment-summary-cron.service.ts:34`, `MAX(fetched_at)`)은 사용자 수만큼 행이 있는 작은 표라 전체를 읽는다 | **필요** (조회 + FK) |
 
 ## 2. 일정 · 알림 · 공휴일 · 카테고리
 
@@ -202,7 +208,7 @@ WHERE deleted_at IS NULL AND type = 'expense'
 
 ### ③ 자산 요약의 현금 델타 (`GROUP BY type`)
 
-`asset/asset.service.ts:30` — 대시보드 · 자산 화면을 열 때마다 돈다. 직전 월말 스냅샷 이후 거래만 더한다.
+`asset/asset.service.ts:24` — 대시보드 · 자산 화면을 열 때마다 돈다. 직전 월말 스냅샷 이후 거래만 더한다.
 
 ```sql
 EXPLAIN

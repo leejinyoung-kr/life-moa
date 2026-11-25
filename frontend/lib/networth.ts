@@ -19,6 +19,15 @@ export interface ByTypeItem {
   avgRate: number | null;
 }
 
+// 투자 줄 보조 — 주식모아에서 하루 한 번 받은 값 (ADR 0011)
+export interface InvestmentInfo {
+  fetchedAt: string; // 받은 시각
+  quoteAt: string | null; // 값에 든 시세 중 가장 오래된 받은 시각
+  netDepositKrw: number; // 원금(순입금)
+  priceMissing: boolean;
+  fxMissing: boolean;
+}
+
 export interface NetWorthSummary {
   totalAssets: number;
   netWorth: number;
@@ -26,6 +35,21 @@ export interface NetWorthSummary {
   changeRate: number | null;
   allocation: AllocationItem[];
   byType: ByTypeItem[];
+  investment: InvestmentInfo | null; // 한 번도 받지 않았으면 null
+}
+
+// 「11/25 00:50」 — 한국 시각. 휴대폰 한 줄에 들어가게 짧게 쓴다
+function monthDayTime(iso: string): string {
+  const k = new Date(new Date(iso).getTime() + 9 * 60 * 60_000);
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${k.getUTCMonth() + 1}/${k.getUTCDate()} ${p(k.getUTCHours())}:${p(k.getUTCMinutes())}`;
+}
+
+// 투자 줄 보조 글자 — 주식모아에서 받은 시각 · 빠진 시세 (어디서 받는지는 페이지 부제목에 적는다)
+export function investmentSubText(info: InvestmentInfo | null): string {
+  if (!info) return '';
+  const missing = info.priceMissing || info.fxMissing ? ' (일부 시세 없음)' : '';
+  return `${monthDayTime(info.fetchedAt)} 기준${missing}`;
 }
 
 export interface TrendPoint {

@@ -1,7 +1,5 @@
 import { Prisma } from '@prisma/client';
 import { AssetService } from './asset.service';
-import { PriceLookupService } from '../investment/price-lookup.service';
-import { SystemLogService } from '../system-log/system-log.service';
 
 // 순자산 요약 · 추이 — 자산이동 이중 계산 방지와 전월 대비 · 이번 달 막대 기준을 검증. Prisma 는 인메모리 가짜.
 describe('AssetService', () => {
@@ -12,21 +10,16 @@ describe('AssetService', () => {
     total_assets: number;
     cash_total: number | null;
   }[];
+  let invest: number | null;
   let prisma: any;
   const dec = (n: number) => new Prisma.Decimal(n);
-  const svc = () =>
-    new AssetService(
-      prisma,
-      {
-        getExchangeRate: jest.fn(async () => 1300),
-      } as unknown as PriceLookupService,
-      { warn: jest.fn() } as unknown as SystemLogService,
-    );
+  const svc = () => new AssetService(prisma);
 
   beforeEach(() => {
     txs = [];
     savings = [];
     snaps = [];
+    invest = null;
     prisma = {
       transaction: {
         groupBy: jest.fn(async () =>
@@ -47,8 +40,21 @@ describe('AssetService', () => {
           savings.map((b) => ({ balance: dec(b), interest_rate: dec(3) })),
         ),
       },
-      investment: { findMany: jest.fn(async () => []) },
-      investmentAccount: { findMany: jest.fn(async () => []) },
+      // 주식모아에서 받은 투자 합계 — 사용자당 한 행
+      investmentSummary: {
+        findUnique: jest.fn(async () =>
+          invest === null
+            ? null
+            : {
+                total_krw: dec(invest),
+                net_deposit_krw: dec(invest - 100_000),
+                quote_at: null,
+                price_missing: false,
+                fx_missing: false,
+                fetched_at: new Date('2026-11-25T00:50:00+09:00'),
+              },
+        ),
+      },
       netWorthSnapshot: {
         // 요약은 month < 이번 달 중 최신 1건, 추이는 month < 이번 달 내림차순
         findFirst: jest.fn(async () => toRow(snaps[snaps.length - 1])),
@@ -75,6 +81,27 @@ describe('AssetService', () => {
     const res = await svc().summary(1);
     expect(res.byType.find((b) => b.type === 'cash')?.amount).toBe(1_500_000);
     expect(res.netWorth).toBe(2_000_000); // 수입 - 지출 = 순자산 증가분과 같다
+  });
+
+  it('투자는 주식모아에서 받은 총 평가액을 그대로 더한다', async () => {
+    txs.push({ type: 'income', amount: 1_000_000 });
+    invest = 3_000_000;
+    const res = await svc().summary(1);
+    expect(res.byType.find((b) => b.type === 'investment')?.amount).toBe(
+      3_000_000,
+    );
+    expect(res.netWorth).toBe(4_000_000);
+    expect(res.investment).toMatchObject({
+      netDepositKrw: 2_900_000,
+      priceMissing: false,
+    });
+  });
+
+  it('투자 합계를 한 번도 받지 않았으면 투자 줄이 없다', async () => {
+    txs.push({ type: 'income', amount: 1_000_000 });
+    const res = await svc().summary(1);
+    expect(res.byType.find((b) => b.type === 'investment')).toBeUndefined();
+    expect(res.investment).toBeNull();
   });
 
   it('직전 월말 스냅샷이 없으면 전월 대비는 null', async () => {

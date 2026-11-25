@@ -12,7 +12,7 @@
 | 상태관리 | TanStack Query (React Query) — lib/query·queryKeys | 전 페이지 전환 완료 |
 | Backend | NestJS 11, TypeScript | 29개 모듈 구현 완료 (AppModule 제외, prisma · crypto-audit 포함. `/_meta` 는 코어 MetaModule) |
 | ORM | Prisma | 구현 완료 |
-| DB | MariaDB 11 | 25개 테이블 구현 완료 |
+| DB | MariaDB 11 | 26개 테이블 구현 완료 |
 | Auth | Google OAuth 2.0 + JWT (전역 가드 + 새 기기 감지) | 구현 완료 |
 | Rate-limit | @nestjs/throttler | 구현 완료 |
 | 암호화 | AES-256-GCM(`CRYPTO_KEYS` 키링 + 필드·사용자 AAD, 부팅 시 자동 재암호화, 암호문 컬럼 평문 저장은 Prisma 쓰기 가드가 차단) / 마스터잠금 scrypt | 구현 완료 |
@@ -135,7 +135,7 @@ flowchart LR
 | investment-account | /investment-accounts | 구현 완료 |
 | investment | /investments | 구현 완료 |
 | subscription | /subscriptions | 구현 완료 |
-| asset | /assets (순자산 요약/추이 — 현금+예적금+투자 집계, 전용 테이블 없음) | 구현 완료 |
+| asset | /assets (순자산 요약/추이 — 현금+예적금+투자 집계. 투자는 주식모아에서 받은 합계 `investment_summary`, ADR 0011) | 구현 완료 |
 | calendar | /calendar (실제 일정 + 구독결제·예적금만기·투자계좌만기 가상 이벤트) | 구현 완료 |
 | holiday | (컨트롤러 없음 — 공휴일 · 대체공휴일 조회 · 연도별 캐시, calendar · 크론이 쓴다) | 구현 완료 |
 | notification | /notifications (알림 인박스. 알림 생성과 웹푸시 적재를 한 트랜잭션으로 묶는다 — `createWithPush`) | 구현 완료 |
@@ -149,7 +149,7 @@ flowchart LR
 | file | /files (Backblaze B2) | 구현 완료 |
 | export | /export | 구현 완료 |
 | import | /import | 구현 완료 |
-| maintenance | (크론 8개 — 알림·반복거래/반복매수 국내·해외(투자 현재가 갱신 포함)·순자산 스냅샷·DB 백업·구독 결제일 갱신·공휴일 사전 캐싱·소프트삭제 항목 자동정리) | 구현 완료 |
+| maintenance | (크론 9개 — 알림·반복거래/반복매수 국내·해외(투자 현재가 갱신 포함)·주식모아 투자 합계 받기·순자산 스냅샷·DB 백업·구독 결제일 갱신·공휴일 사전 캐싱·소프트삭제 항목 자동정리) | 구현 완료 |
 | mail | (SMTP 메일 발송 — 이메일 코드 로그인 등, 미설정 시 no-op) | 구현 완료 |
 | push | /push (웹 푸시 구독/발송 — VAPID + 발송 아웃박스: 커밋된 것만 발송·멱등키·재시도·원본 에러 보존) | 구현 완료 |
 | system-log | /system-logs (백그라운드 작업 실행 로그 — 크론·투자 현재가 갱신 등, 조회 전용) | 구현 완료 |
@@ -176,6 +176,7 @@ flowchart LR
 | 매일 09:00 | `notification-daily` · 10분 | notification-cron.service.ts | 사용자별 알림 생성(예적금·투자계좌 만기 D-30/14/7/1, 구독결제/체험종료 D-7/3/1, 비번회전 90일 경과 후 30일 간격 재알림) + 웹푸시 발송. 매일 반복 알림을 막기 위해 해당 일자에 정확히 일치할 때만 생성. 만기 알림은 설정(`notifMaturity`), 비번회전 알림은 설정(`notifPwRotation`)으로 토글 가능 |
 | 매일 09:00 | `recurring-domestic` · 30분 | recurring-cron.service.ts (`run`) | 반복거래(국내, `transaction.service.ts`의 `materializeRecurring`)는 매일 실행. 반복매수(국내, `investment.service.ts`의 `materializeRecurringBuys`) + 국내 투자 종목 현재가 갱신(`refreshCurrentValues`)은 실제 증권시장이 열리는 평일(KST 기준, `isWeekdayKST()`)에만 실행하고 주말엔 건너뜀. 전체 사용자를 순회하며, 사용자별 실패는 시스템 로그에 남기고 계속 진행한 뒤 실행은 실패로 마감. 반복거래/반복매수는 서로 독립적으로 처리 건수를 집계해 완료 로그도 따로 남기며, 처리한 항목이 0건이고 실패도 없으면 그 로그는 남기지 않는다. 반복매수는 종목별로 외부 시세조회 API(네이버/야후)를 호출하므로 3종목씩 묶어 묶음 사이 3초 대기(현재가 갱신은 5종목씩 2초 대기) |
 | 매일 23:00 | `recurring-foreign` · 30분 | recurring-cron.service.ts (`runForeign`) | 반복매수(해외 — foreign_stock/foreign_etf) 회차 일괄 생성 + 해외 투자 종목 현재가 갱신. 미국 장이 열린 직후 실시간 가격으로 매수하도록 국내 배치와 시간을 분리. 평일(KST 기준)에만 실행하고 주말엔 건너뜀(실행 기록 요약에만 `주말 — 건너뜀`). 처리한 반복매수가 0건이고 실패도 없으면 완료 로그를 남기지 않는다 |
+| 매일 00:50 | `investment-summary` · 5분 | investment-summary-cron.service.ts | 사용자마다 주식모아 내부 API(`STOCKMOA_INTERNAL_URL` + `/api/v1/internal/summary`, 내부 토큰 · `X-User-Email` 헤더)에서 투자 합계를 받아 `investment_summary` 에 덮어쓴다 — 01:00 순자산 스냅샷이 그 값을 찍는다. 주식모아에 없는 사용자(「사용자 없음」 404)는 건너뛰고, 그 밖의 실패는 마지막 값을 두고 시스템 로그(`asset`)에 남긴 뒤 실행을 실패로 마감. 주소 · 토큰이 없으면(로컬 · 데모) 건너뜀. 부팅 때도 마지막으로 받은 지 20시간이 넘었으면 한 번 받는다 — 배포 직후 「투자」 가 비지 않게 (ADR 0011) |
 | 매일 01:00 | `net-worth-snapshot` · 10분 | net-worth-snapshot-cron.service.ts | 사용자별 **어제가 속한 달**(YYYY-MM) 이름으로 지금 총자산(현금+예적금+투자)·현금 총액(`cash_total`)을 upsert — 같은 달엔 매일 덮어써서 다음 달 1일 새벽 저장이 월말 값이 된다(예적금·투자는 이력이 없어 지금 값만 찍을 수 있으므로 이름표는 찍은 시점의 달). `total_debt`는 부동산/부채 기능 제거 이후 항상 0, 과거 기록값은 유지. `cash_total`(현금 = 수입 − 지출 − 자산이동)은 자산 요약 API(`/assets/summary`)가 전체 거래를 매번 재집계하지 않고 직전 월말 스냅샷 + 이후 거래 델타로 계산하는 기준점. 2026-10-14 전에는 매주 월요일에 지난달 이름으로 지금 값을 덮어써 이름표가 한 달 밀렸다 — 마이그레이션 `20261014090000_fix_net_worth_snapshot_label_and_cash` 가 바로잡음 |
 | 매월 1일 02:00 | `holiday-prefetch` · 5분 | holiday-cron.service.ts | 올해·내년 공휴일을 미리 캐싱(공공데이터포털 특일 정보 API) — 캘린더를 열 때 외부 호출이 없게 한다 |
 

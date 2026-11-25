@@ -33,7 +33,7 @@ life-moa/
 │       ├── investment-account/ # 투자 계좌 (예수금 원화·달러 — 종목 여러 개가 공유)
 │       ├── investment/    # 투자 종목 (계좌에 속함)
 │       ├── subscription/  # 구독 서비스
-│       ├── asset/         # 순자산 요약/추이 (현금+예적금+투자 집계, 전용 테이블 없음)
+│       ├── asset/         # 순자산 요약/추이 (현금+예적금+투자 집계) + 주식모아 투자 합계 받기(investment_summary, ADR 0011)
 │       ├── notification/  # 알림
 │       ├── calendar/      # 캘린더 (실제 일정(양력/음력) + 구독/예적금/투자계좌만기/공휴일 가상 이벤트 연동)
 │       ├── holiday/       # 공휴일·대체공휴일 (공공데이터포털 특일 정보 API 연동 + 연 단위 캐싱)
@@ -47,7 +47,7 @@ life-moa/
 │       ├── file/          # 파일 보관함 (Backblaze B2)
 │       ├── export/        # 데이터 내보내기 (계정 JSON·전체 ZIP)
 │       ├── import/        # 데이터 가져오기 (계정 JSON 복원)
-│       ├── maintenance/   # 예약 작업 @Job(core-jobs) 8개 (알림·반복거래/반복매수 국내·해외(투자 현재가 갱신 포함)·구독 결제일 갱신·순자산 스냅샷·소프트삭제 항목 자동정리·DB 백업·공휴일 사전 캐싱) + 실행 기록 저장소(job_run)
+│       ├── maintenance/   # 예약 작업 @Job(core-jobs) 9개 (알림·반복거래/반복매수 국내·해외(투자 현재가 갱신 포함)·구독 결제일 갱신·주식모아 투자 합계 받기·순자산 스냅샷·소프트삭제 항목 자동정리·DB 백업·공휴일 사전 캐싱) + 실행 기록 저장소(job_run)
 │       ├── mail/          # SMTP 메일 발송 (이메일 코드 로그인 등)
 │       ├── push/          # 웹 푸시 구독/발송 (VAPID) + 발송 아웃박스 저장소·채널(outbox_message)
 │       ├── system-log/    # 시스템 로그 (크론·투자 갱신 등 백그라운드 작업 실행 기록, 90일 경과 시 자동 삭제)
@@ -67,7 +67,7 @@ life-moa/
 
 ### 데이터 모델
 
-MariaDB(utf8mb4_unicode_ci) 25개 테이블. 엔티티 · 필드 · 관계 · 규칙은 [docs/erd.md](docs/erd.md) 를 본다.
+MariaDB(utf8mb4_unicode_ci) 26개 테이블. 엔티티 · 필드 · 관계 · 규칙은 [docs/erd.md](docs/erd.md) 를 본다.
 
 ---
 

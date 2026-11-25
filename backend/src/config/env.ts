@@ -96,6 +96,11 @@ export const envShape = {
     .transform((v) => v === 'true'),
   // 사용자별 파일 저장 한도(MB) — 미설정이면 한도 없음
   STORAGE_QUOTA_MB: z.coerce.number().int().positive().optional(),
+
+  // 주식모아 내부 API — 순자산 「투자」 한 줄을 하루 한 번 받는다. 둘 다 비우면 받지 않는다(로컬 · 데모) (ADR 0011)
+  STOCKMOA_INTERNAL_URL: z.url().optional(),
+  // 주식모아 backend/.env 의 INTERNAL_API_TOKEN 과 같은 값
+  STOCKMOA_INTERNAL_TOKEN: secret().optional(),
 };
 
 export const envOptions = {
@@ -106,6 +111,7 @@ export const envOptions = {
   allOrNone: [
     ['SMTP_HOST', 'SMTP_USER', 'SMTP_PASS'],
     ['VAPID_PUBLIC_KEY', 'VAPID_PRIVATE_KEY'],
+    ['STOCKMOA_INTERNAL_URL', 'STOCKMOA_INTERNAL_TOKEN'],
   ],
 } satisfies Parameters<typeof defineEnv<typeof envShape>>[1];
 

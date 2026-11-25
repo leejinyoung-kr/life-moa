@@ -16,6 +16,7 @@
 | Investment | 투자 종목 (소속 계좌의 예수금을 매수/매도로 전환) |
 | Subscription | 구독 서비스 |
 | NetWorthSnapshot | 순자산 월별 스냅샷 |
+| InvestmentSummary | 투자 합계 — 주식모아(따로 운영하는 투자 앱)에서 하루 한 번 받은 값, 사용자당 1행 (ADR 0011) |
 | UserSettings | 사용자 설정 (1:1) |
 | Notification | 알림 |
 | CalendarEvent | 캘린더 일정 (양력/음력, 매년 음력 반복 지원, `notify` 켜면 회차 당일 오전 9시 알림 · 푸시) |
@@ -42,6 +43,7 @@ User 1 ─── N (Transaction, Saving, InvestmentAccount, Investment, Subscrip
               StorageFolder, StorageFile, AccessLog, RefreshToken, PushSubscription,
               TransactionFavorite)
 User 1 ─── 1 UserSettings
+User 1 ─── 0..1 InvestmentSummary
 User 1 ─── N RecurringSchedule
 RecurringSchedule 1 ─── N Transaction(recurring_schedule_id, 자동 생성 회차)
 Subscription 1 ─── N Transaction(subscription_id, 결제일이 지나 자동 등록된 지출)
@@ -72,10 +74,11 @@ LoginSession   1 ─── N PushSubscription(session_id, CASCADE — 세션 행
 - `InvestmentAccount` — `name`(계좌명, 예: ISA·일반위탁), `cash_balance`(예수금 — 자산이동으로 충전, 매수/매도로 보유 종목과 전환. 계좌 내 종목들이 공유), `account_number_enc`(계좌번호, AES-256-GCM 암호화 — 동일 계좌명 다중 보유 시 구분용, 응답 시 마스킹), `start_date`·`maturity_date`(ISA 등 만기 — 둘 다 선택값, 생성 시 만기일 미입력하면 가입일+3년으로 자동 계산)
 - `Investment` — `account_id`(InvestmentAccount FK), `type`(domestic_stock/foreign_stock/foreign_etf/domestic_etf/crypto/etc), `principal`, `principal_usd`(해외종목 달러 원금 — 국내종목은 null), `current_value`, `purchase_date`
 
-### 자산 — Subscription / NetWorthSnapshot
+### 자산 — Subscription / NetWorthSnapshot / InvestmentSummary
 
 - `Subscription` — `category`(코드 관리 `subscription` code), `pay_method`(코드 관리 `pay_method` code — 2026-10-20 전에는 이름, ADR 0009), `currency`(KRW/USD), `cycle`(monthly/yearly/weekly), `status`(active/trial/paused), `next_payment_date`, `billing_day`(원래 결제일 1-31 — 말일로 줄어든 결제일을 다음 달에 되돌리는 기준, 결제일을 바꿔 저장할 때만 갱신), `auto_ledger`(가계부 자동 등록, 기본 켜짐), `last_used_at` — 지난 결제일은 매일 00:05 `subscription-roll-forward` 가 주기만큼 넘긴다(체험은 종료일이 지나면 active 로). `auto_ledger` 면 넘기면서 지나간 결제일마다 가계부 지출(카테고리 `insurance_subscription`)을 만든다 — 구독 등록 전 결제일은 제외, 일시정지를 풀 때는 지난 결제일을 먼저 오늘 이후로 넘긴다 — USD 구독은 요약 통계 계산 시 `PriceLookupService`(frankfurter.app)로 조회한 환율로 원화 환산
 - `NetWorthSnapshot` — `month`(YYYY-MM), `total_assets`(현금+예적금+투자 집계), `total_debt`(부동산/부채 기능 제거 이후로는 항상 0 — 과거 스냅샷의 기록값은 유지), `cash_total?`(그 달 말 기준 누적 현금 총액 캐시 — 자산 요약 API의 델타 계산 기준점, 과거 행은 null 허용) (`@@unique([user_id, month])`)
+- `InvestmentSummary` — `total_krw`(총 평가액 — 종목 평가 + 예수금, 세전, 원화 — 순자산 「투자」 한 줄), `net_deposit_krw`(원금 = 순입금), `quote_at?`(값에 든 시세 중 가장 오래된 받은 시각), `price_missing` · `fx_missing`(시세 · 환율이 빠진 값이 섞임), `fetched_at`(마지막으로 받은 시각 — 받기가 실패하면 그대로 남아 화면에 「n월 n일 기준」 으로 보인다) (`user_id` UNIQUE). 매일 00:50 `investment-summary` 가 주식모아 내부 API 에서 받아 덮어쓴다. 데모 · 로컬은 받지 않고 시드가 샘플 한 행을 넣는다
 
 ### 설정 — UserSettings (1:1)
 

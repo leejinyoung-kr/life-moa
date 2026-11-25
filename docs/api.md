@@ -134,7 +134,7 @@ Base URL: `http://localhost:8000/api/v1`
 
 | Method | Endpoint | 설명 |
 | --- | --- | --- |
-| GET | /assets/summary | 순자산 요약 (현금+예적금+투자 집계, 현금 = 수입 − 지출 − 자산이동). 전월 대비(`changeAmount` · `changeRate`)는 직전 월말 스냅샷 기준, 없으면 null |
+| GET | /assets/summary | 순자산 요약 (현금+예적금+투자 집계, 현금 = 수입 − 지출 − 자산이동, 투자 = 주식모아에서 받은 총 평가액 `investment_summary.total_krw`). 전월 대비(`changeAmount` · `changeRate`)는 직전 월말 스냅샷 기준, 없으면 null. `investment`(`fetchedAt` · `quoteAt` · `netDepositKrw` · `priceMissing` · `fxMissing`) — 한 번도 받지 않았으면 null |
 | GET | /assets/trend | 순자산 추이 — 지난 5개월 월말 스냅샷 + 이번 달 지금 값(`current: true`, 요약 숫자와 같다) |
 
 ## 알림

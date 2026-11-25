@@ -17,6 +17,7 @@ import type { SeedFn } from './seeds/helpers';
 import { seedTransactions } from './seeds/transactions.seed';
 import { seedSavings } from './seeds/savings.seed';
 import { seedInvestments } from './seeds/investments.seed';
+import { seedInvestmentSummary } from './seeds/investment-summary.seed';
 import { seedSubscriptions } from './seeds/subscriptions.seed';
 import { seedNetWorthSnapshots } from './seeds/net-worth-snapshot.seed';
 import { seedSettings } from './seeds/settings.seed';
@@ -38,6 +39,7 @@ const prisma = new PrismaClient({ adapter });
 const SEEDS: { name: string; run: SeedFn }[] = [
   { name: '예적금', run: seedSavings },
   { name: '투자', run: seedInvestments },
+  { name: '투자 합계', run: seedInvestmentSummary },
   { name: '수입/지출', run: seedTransactions },
   { name: '순자산 스냅샷', run: seedNetWorthSnapshots },
   { name: '즐겨찾기', run: seedFavorites },

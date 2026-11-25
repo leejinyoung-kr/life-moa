@@ -119,7 +119,7 @@
 | Rate limit(`@Throttle`) — 비번 열람 · TOTP · 보관함 잠금해제 | `credential/credential.controller.ts` 등 6곳 | 없음 | 무차별 대입 방어 |
 | 암호문 컬럼 쓰기 가드 — 평문이 `_enc` 컬럼에 저장되지 않는지 | `prisma/prisma.service.ts` (core-security `encryptedFields`) | 없음 (`crypto-fields.spec` 은 목록 대조만) | 가드가 빠지면 평문 비번이 DB 에 그대로 남는다 |
 | 데이터 내보내기 — 계정 JSON 의 이메일 문맥 암호화 · 전체 ZIP | `export/export.service.ts` | 없음 (복원 쪽 `import` 만 있음) | 내보내기 → 가져오기 왕복이 깨지면 백업이 쓸모없어진다 |
-| 순자산 월말 스냅샷 + 현금 델타 | `maintenance/net-worth-snapshot-cron.service.ts`, `asset/asset.service.ts:74` | 크론 테스트 없음 · 델타 경로 미검증 (가짜 후보 ③) | 대시보드 첫 숫자. 이중 계산 버그가 실제로 있었던 곳 |
+| 순자산 월말 스냅샷 + 현금 델타 | `maintenance/net-worth-snapshot-cron.service.ts`, `asset/asset.service.ts:63` | 크론 테스트 없음 · 델타 경로 미검증 (가짜 후보 ③) | 대시보드 첫 숫자. 이중 계산 버그가 실제로 있었던 곳 |
 | 가계부 목록 · 월 요약 · 월별 추이 합계 | `transaction/transaction.service.ts:314`~`:426` | 없음 (자산이동 잔액만 있음) | 화면의 수입 · 지출 · 잔액 숫자 |
 | 반복거래 회차 생성 (멱등 · 시작일 이전 회차 제외 · 자산이동 일괄 반영) | `transaction/transaction.service.ts:186`~`:281` | 없음 (순수 함수 `recurring.util` 만) | 매일 크론이 돈다 — 두 번 생성되면 돈이 두 번 빠진다. 반복매수 쪽(`investment`)은 테스트가 있다 |
 | 가계부 엑셀 가져오기 · 내보내기 | `transaction/transaction.service.ts:465`, `:575` | 없음 (계정 엑셀만 있음) | 대량 입력 경로 |
