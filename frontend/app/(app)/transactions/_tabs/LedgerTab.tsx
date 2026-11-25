@@ -43,12 +43,12 @@ import FilterPanel from '@/components/FilterPanel';
 import ExcelToolbar from '@/components/ExcelToolbar';
 import ListToolbar from '@/components/ListToolbar';
 import {
-  TX_TYPE_LABEL, WEEKEND_ADJUST_LABEL, TRANSFER_TARGET_LABEL, recurringRuleSummary, WEEKDAY_LABEL,
+  TX_TYPE_LABEL, WEEKEND_ADJUST_LABEL, TRANSFER_TARGET_LABEL, TRANSFER_TARGET_CHOICES, choosableTarget, recurringRuleSummary, WEEKDAY_LABEL,
   won, dotDate, localDate,
   activeWith, categoryOptions,
   type Category, type Transaction, type TransactionFavorite, type TransactionSummary, type TrendBucket,
   type TransactionType, type RecurringCycle, type WeekendAdjust, type TransferTarget,
-  type Saving, type InvestmentAccount, type RecurringSchedule,
+  type Saving, type RecurringSchedule,
 } from '@/lib/finance';
 import { AMT_COLOR, toDay, monthsAgo, useAddTrigger, ruleDayFor } from '../_shared';
 
@@ -153,8 +153,8 @@ export default function LedgerTab({ categories, bankCats, payMethodCats, addTrig
   const trend = trendQuery.data ?? [];
   const recurring = recurringQuery.data ?? [];
   const error = (rowsQuery.error ?? summaryQuery.error)?.message ?? null;
-  // 자산이동 거래가 예적금/투자 잔액을 바꿀 수 있어 해당 탭도 함께 무효화
-  const reload = () => invalidate(qk.transactions.all, qk.savings.all, qk.investments.all, qk.investmentAccounts.all);
+  // 자산이동 거래가 예적금 잔액을 바꿀 수 있어 해당 탭도 함께 무효화
+  const reload = () => invalidate(qk.transactions.all, qk.savings.all);
   const reloadRecurring = () => invalidate(qk.recurringSchedules.all);
 
   // 즐겨찾기 — 즐겨찾기 줄·관리 창에서 직접 등록/수정한다 (내역 행에서 등록하지 않음)
@@ -314,14 +314,14 @@ export default function LedgerTab({ categories, bankCats, payMethodCats, addTrig
         <StatStrip>
           <StatCard icon={<IconWon />} tone="green" value={won(summary.income)} valueTone="in" label="수입" change="이번 달 합계" />
           <StatCard icon={<IconWon />} tone="red" value={won(summary.expense)} valueTone="out" label="지출" change="이번 달 합계" />
-          <StatCard icon={<IconTransfer />} tone="blue" value={won(summary.transfer)} valueTone="move" label="자산이동" change="예적금 · 투자로 옮긴 돈" />
+          <StatCard icon={<IconTransfer />} tone="blue" value={won(summary.transfer)} valueTone="move" label="자산이동" change="예적금 · 증권 계좌로 옮긴 돈" />
           <StatCard icon={<IconChart />} tone="amber" value={won(summary.balance)} valueTone={summary.balance < 0 ? 'out' : undefined} label="잔액" change="수입 − 지출 − 자산이동" />
         </StatStrip>
       )}
 
       <p className="flex items-center gap-1.5 text-[0.75rem] text-muted mb-6">
         <IconInfo width={13} height={13} className="shrink-0" />
-        <span><span className="text-blue">자산이동</span>은 예적금 · 투자 계좌로 옮긴 돈이라 지출에는 들지 않고, 잔액에서는 빠집니다.</span>
+        <span><span className="text-blue">자산이동</span>은 예적금 · 증권 계좌로 옮긴 돈이라 지출에는 들지 않고, 잔액에서는 빠집니다.</span>
       </p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
@@ -829,13 +829,9 @@ function LedgerModal({ state, categories, bankCats: allBanks, payMethodCats: all
   const targetPickerOpen = state.open && type === 'transfer';
   // 이동 대상 후보 — 자산이동일 때만 조회(연동 없이 단순 기록도 허용하므로 항상 강제하지 않음)
   const savingsQuery = useApiQuery<Saving[]>(qk.savings.list('transfer-target'), '/savings', { enabled: targetPickerOpen && targetType === 'saving' });
-  // 투자는 종목(Investment)이 아니라 예수금을 보유한 투자 계좌(InvestmentAccount)가 자산이동 대상
-  const investmentAccountsQuery = useApiQuery<InvestmentAccount[]>(qk.investmentAccounts.list('transfer-target'), '/investment-accounts', { enabled: targetPickerOpen && targetType === 'investment' });
   const targetItems: { id: number; label: string }[] = targetType === 'saving'
     ? (savingsQuery.data ?? []).map((s) => ({ id: s.id, label: `${allBanks.find((b) => b.code === s.bank)?.label ?? s.bank} · ${s.name}` }))
-    : targetType === 'investment'
-      ? (investmentAccountsQuery.data ?? []).map((a) => ({ id: a.id, label: a.name }))
-      : [];
+    : [];
 
   useEffect(() => {
     if (!state.open) return;
@@ -856,7 +852,8 @@ function LedgerModal({ state, categories, bankCats: allBanks, payMethodCats: all
     setAmount(e ? String(e.amount) : pf?.amount ? String(pf.amount) : '');
     setPayMethod(e?.payMethod ?? pf?.payMethod ?? (initType === 'income' ? (bankCats[0]?.code ?? '') : initType === 'transfer' ? '' : (payMethodCats[0]?.code ?? '')));
     setMemo(e?.memo ?? pf?.memo ?? '');
-    setTargetType(e ? (e.targetType ?? '') : (pf?.targetType ?? ''));
+    // 옛 투자 계좌 자산이동(investment, 연결 없음)은 고를 수 없는 대상이라 「연동 없음」 으로 — 저장해도 DB 의 대상 종류는 그대로 남는다
+    setTargetType(choosableTarget(e ? e.targetType : pf?.targetType));
     setTargetId(e ? (e.targetId ?? '') : (pf?.targetId ?? ''));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 모달 열림/수정대상 변경 · 목록 도착 시에만 폼 초기화
   }, [state.open, e, listsReady]);
@@ -950,8 +947,8 @@ function LedgerModal({ state, categories, bankCats: allBanks, payMethodCats: all
           <Field label="이동 대상">
             <select className="input" value={targetType} onChange={(ev) => handleChangeTargetType(ev.target.value as TransferTarget | '')}>
               <option value="">연동 없음(단순 기록)</option>
-              {(Object.entries(TRANSFER_TARGET_LABEL) as [TransferTarget, string][]).map(([v, label]) => (
-                <option key={v} value={v}>{label}</option>
+              {TRANSFER_TARGET_CHOICES.map((v) => (
+                <option key={v} value={v}>{TRANSFER_TARGET_LABEL[v]}</option>
               ))}
             </select>
           </Field>
@@ -1016,12 +1013,9 @@ function RecurringTransactionModal({ state, categories, bankCats: allBanks, payM
 
   const targetPickerOpen = state.open && type === 'transfer';
   const savingsQuery = useApiQuery<Saving[]>(qk.savings.list('transfer-target'), '/savings', { enabled: targetPickerOpen && targetType === 'saving' });
-  const investmentAccountsQuery = useApiQuery<InvestmentAccount[]>(qk.investmentAccounts.list('transfer-target'), '/investment-accounts', { enabled: targetPickerOpen && targetType === 'investment' });
   const targetItems: { id: number; label: string }[] = targetType === 'saving'
     ? (savingsQuery.data ?? []).map((s) => ({ id: s.id, label: `${allBanks.find((b) => b.code === s.bank)?.label ?? s.bank} · ${s.name}` }))
-    : targetType === 'investment'
-      ? (investmentAccountsQuery.data ?? []).map((a) => ({ id: a.id, label: a.name }))
-      : [];
+    : [];
 
   useEffect(() => {
     if (!state.open) return;
@@ -1047,7 +1041,7 @@ function RecurringTransactionModal({ state, categories, bankCats: allBanks, payM
     setRecurringDay(r?.rule?.day ?? init.day);
     setRecurringMonth(r?.rule?.month ?? init.month);
     setWeekendAdjust(r?.rule?.weekendAdjust ?? 'none');
-    setTargetType(r?.targetType ?? '');
+    setTargetType(choosableTarget(r?.targetType));
     setTargetId(r?.targetId ?? '');
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 모달 열림/수정대상 변경 시에만 폼 초기화
   }, [state.open, r]);
@@ -1158,8 +1152,8 @@ function RecurringTransactionModal({ state, categories, bankCats: allBanks, payM
             <Field label="이동 대상">
               <select className="input" value={targetType} onChange={(ev) => handleChangeTargetType(ev.target.value as TransferTarget | '')}>
                 <option value="">연동 없음(단순 기록)</option>
-                {(Object.entries(TRANSFER_TARGET_LABEL) as [TransferTarget, string][]).map(([v, label]) => (
-                  <option key={v} value={v}>{label}</option>
+                {TRANSFER_TARGET_CHOICES.map((v) => (
+                  <option key={v} value={v}>{TRANSFER_TARGET_LABEL[v]}</option>
                 ))}
               </select>
             </Field>

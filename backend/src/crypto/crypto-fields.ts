@@ -12,11 +12,6 @@ export const ENCRYPTED_COLUMNS = [
     column: 'backup_codes_enc',
     field: 'credential.backup_codes_enc',
   },
-  {
-    table: 'investment_account',
-    column: 'account_number_enc',
-    field: 'investmentAccount.account_number_enc',
-  },
 ] as const;
 
 export type EncryptedColumn = (typeof ENCRYPTED_COLUMNS)[number];

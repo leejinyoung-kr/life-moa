@@ -37,14 +37,14 @@ Base URL: `http://localhost:8000/api/v1`
 | GET | /transactions?from=&to=&type=&category=&q=&page=&limit= | 내역 목록 (날짜범위/유형/카테고리/검색 필터, `page` 지정 시 서버 페이징) |
 | GET | /transactions/summary?month= | 월 요약 (수입/지출/저축이동/실소비/잔액) |
 | GET | /transactions/monthly-trend?month= | 월별 지출 추이 (최근 5개월) |
-| POST | /transactions | 내역 추가 (`type='transfer'`이고 `targetType`·`targetId` 지정 시 대상 잔액에 자동 반영) |
+| POST | /transactions | 내역 추가 (`type='transfer'`이고 `targetType`·`targetId` 지정 시 대상 잔액에 자동 반영 — 새로 고를 수 있는 대상은 `saving` 뿐. 옛 `investment`(투자 계좌 예수금)는 2026-11 투자 기능을 주식모아로 옮기며 연결 id 없이 남는다, ADR 0011) |
 | POST | /transactions/import | 엑셀 양식(.xlsx) 업로드 → 행별 검증 후 일괄 추가 (multipart, 필드명 `file`, 최대 5MB) |
 | GET | /transactions/export?from=&to=&type=&category=&q= | 현재 필터 내역을 .xlsx 로 스트리밍 다운로드 |
 | PUT | /transactions/:id | 내역 수정 |
 | DELETE | /transactions/bulk | 선택 일괄 삭제 (본문 `{ ids: number[] }`, soft delete — 자산이동 내역은 대상 잔액도 되돌린다, 한 트랜잭션). 응답 `{ count }`, `ids` 가 비면 400 |
 | DELETE | /transactions/:id | 내역 삭제 (soft delete) |
 
-> 반복거래/반복매수는 이 엔드포인트가 아닌 [자동이체 설정](#자동이체-설정) API에서 별도로 등록/관리한다 — 거래·투자 등록은 항상 순수 데이터 생성만 한다.
+> 반복거래는 이 엔드포인트가 아닌 [자동이체 설정](#자동이체-설정) API에서 별도로 등록/관리한다 — 거래 등록은 항상 순수 데이터 생성만 한다.
 
 > 목록 응답(페이징 시): `{ items, total, page, limit, sumIncome, sumExpense, sumTransfer }` — 합계는 현재 페이지가 아닌 필터 전체 기준.
 
@@ -63,34 +63,7 @@ Base URL: `http://localhost:8000/api/v1`
 | DELETE | /savings/bulk | 선택 일괄 삭제 (본문 `{ ids: number[] }`, soft delete). 응답 `{ count }`, `ids` 가 비면 400 |
 | DELETE | /savings/:id | 예적금 삭제 (soft delete) |
 
-## 가계부 — 투자 계좌
-
-예수금은 계좌(InvestmentAccount) 단위로 보유하며, 한 계좌에 속한 여러 종목이 예수금을 공유한다(ISA 등).
-
-| Method | Endpoint | 설명 |
-| --- | --- | --- |
-| GET | /investment-accounts | 계좌 목록 (계좌명 검색 + 페이지네이션) |
-| GET | /investment-accounts/summary | 요약 (총 예수금/계좌 수) |
-| POST | /investment-accounts | 계좌 추가 |
-| PUT | /investment-accounts/:id | 계좌 수정 |
-| POST | /investment-accounts/:id/exchange | 환전 — `direction`(krw_to_usd · usd_to_krw) · `amount`(빠지는 통화) · `toAmount`(받는 통화, 주면 그대로 반영) · `rate`(toAmount 없을 때, 비우면 실시간 환율) |
-| DELETE | /investment-accounts/:id | 계좌 삭제 (soft delete) |
-
-## 가계부 — 투자
-
-| Method | Endpoint | 설명 |
-| --- | --- | --- |
-| GET | /investments?accountId=&type=&q= | 투자 목록 (수익/수익률 파생값 포함, 계좌/유형/종목명 필터) |
-| GET | /investments/summary | 요약 (총 평가금액/원금/수익/수익률) |
-| GET | /investments/exchange-rate | 현재 USD/KRW 환율 (해외투자 USD 표기 토글용) |
-| POST | /investments | 투자 추가 (`accountId` 필수 — 소속 계좌) |
-| PUT | /investments/:id | 투자 수정 |
-| GET | /investments/:id/price | 시세조회 — 등록된 종목코드/티커로 현재가(국내 네이버, 해외 Yahoo + 환율). 응답 `{ price, currency, krwPrice, name, quantity, evaluatedValue }`(평가금액 = 원화 단가 × 보유수량). 종목코드나 보유수량이 없으면 400 |
-| GET | /investments/:id/quote | 시세조회(단가만) — 매수/매도 창의 단가 자동입력용. 응답 `{ price, currency, krwPrice, name }`, 보유수량 없어도 된다. 종목코드가 없으면 400 |
-| POST | /investments/:id/buy | 매수 — 소속 계좌 예수금 → 투자원금·평가금액 전환 |
-| POST | /investments/:id/sell | 매도 — 평가금액 → 소속 계좌 예수금 환입 |
-| DELETE | /investments/bulk | 선택 일괄 삭제 (본문 `{ ids: number[] }`, soft delete). 응답 `{ count }`, `ids` 가 비면 400 |
-| DELETE | /investments/:id | 투자 삭제 (soft delete) |
+> 투자 계좌 · 투자 종목 API(`/investment-accounts` · `/investments`)는 2026-11 투자 기능을 주식모아로 옮기며 뺐다. 순자산의 투자 몫은 [순자산](#순자산-자산) `/assets/summary` 의 `investment` (ADR 0011)
 
 ## 거래 즐겨찾기
 
@@ -106,18 +79,17 @@ Base URL: `http://localhost:8000/api/v1`
 
 ## 자동이체 설정
 
-반복거래(수입/지출/자산이동)·반복매수(주식모으기) 자동 생성 규칙. 거래/투자 등록 폼과 분리된 전용 CRUD — 저장 시 데이터를 즉시 생성하지 않고, `RecurringCronService`가 매일 규칙에 따라 순수 생성만 한다.
+반복거래(수입/지출/자산이동) 자동 생성 규칙. 거래 등록 폼과 분리된 전용 CRUD — 저장 시 데이터를 즉시 생성하지 않고, `RecurringCronService`가 매일 규칙에 따라 순수 생성만 한다.
 
 | Method | Endpoint | 설명 |
 | --- | --- | --- |
-| GET | /recurring-schedules?kind= | 자동이체 설정 목록 (`kind=transaction`\|`investment` 필터) |
-| POST | /recurring-schedules | 자동이체 설정 추가 (`kind`에 따라 거래/투자 전용 필드 사용) |
+| GET | /recurring-schedules?kind= | 자동이체 설정 목록 (`kind=transaction` — 반복매수 `investment` 는 2026-11 뺐다) |
+| POST | /recurring-schedules | 자동이체 설정 추가 (`kind=transaction`) |
 | PUT | /recurring-schedules/:id | 자동이체 설정 수정 |
 | PATCH | /recurring-schedules/:id/toggle | 활성/일시정지 토글 |
-| DELETE | /recurring-schedules/:id | 자동이체 설정 삭제 (soft delete — 이미 생성된 거래/매수 내역은 유지) |
+| DELETE | /recurring-schedules/:id | 자동이체 설정 삭제 (soft delete — 이미 생성된 거래 내역은 유지) |
 
-> `kind=transaction`: `txType`·`title`·`category`·`amount`·`payMethod`·`memo`·`targetType`·`targetId` 사용. 생성된 회차는 `Transaction.recurring_schedule_id`로 연결되며, `recurring_period`로 중복 생성을 막는다(idempotent).
-> `kind=investment`: `investmentId`(대상 종목, symbol 필수)·`buyAmount` 또는 `buyQuantity`(상호배타) 사용. 크론이 해당 종목 행을 직접 누적 갱신한다(신규 거래 행을 만들지 않음).
+> `kind=transaction`: `txType`·`title`·`category`·`amount`·`payMethod`·`memo`·`targetType`(`saving`)·`targetId` 사용. 생성된 회차는 `Transaction.recurring_schedule_id`로 연결되며, `recurring_period`로 중복 생성을 막는다(idempotent).
 > 공통: `rule`(cycle/day/month/weekendAdjust) · `startDate`(최초 실행 기준일) · `active`(false면 새 회차를 생성하지 않음). 응답에는 `nextRunDate`(다음 실행 예정일)가 함께 내려온다.
 
 ## 구독 관리
@@ -149,19 +121,19 @@ Base URL: `http://localhost:8000/api/v1`
 | DELETE | /notifications/:id | 단건 삭제 (영구 삭제). 응답 `{ id }`, 남의 알림 · 없는 id 는 404 |
 | DELETE | /notifications | 전체 삭제 |
 
-> 알림 자동생성 크론(매일 9시): 예적금·투자계좌 만기(D-30/14/7/1)·구독결제/체험종료(D-7/3/1)·비번회전(90일 경과 후 30일 간격 재알림). 만기 · 결제는 `notif_maturity`, 비번회전은 `notif_pw_rotation` 설정으로 게이팅.
+> 알림 자동생성 크론(매일 9시): 예적금 만기(D-30/14/7/1)·구독결제/체험종료(D-7/3/1)·비번회전(90일 경과 후 30일 간격 재알림). 만기 · 결제는 `notif_maturity`, 비번회전은 `notif_pw_rotation` 설정으로 게이팅.
 > 캘린더 일정은 `notify` 를 켠 것만 회차 당일 알림(반복 · 음력 회차 포함, 출처 '캘린더', 푸시를 누르면 /calendar). `notif_deadline` 설정으로 게이팅. 반복 일정은 제목이 같아 설명(날짜)까지 같은 안 읽은 알림이 있을 때만 건너뛴다.
 
 ## 캘린더
 
 | Method | Endpoint | 설명 |
 | --- | --- | --- |
-| GET | /calendar | 이벤트 목록 (실제 + 구독결제·예적금만기·투자계좌만기(ISA 등)·공휴일 가상 이벤트) |
+| GET | /calendar | 이벤트 목록 (실제 + 구독결제·예적금만기·공휴일 가상 이벤트. 투자계좌 만기는 2026-11 실제 일정으로 옮겼다) |
 | GET | /calendar/upcoming | 다가오는 이벤트 |
 | POST | /calendar | 이벤트 생성 (양력/음력, 음력은 매년 반복만 지원, `notify` 당일 오전 9시 알림) |
 | POST | /calendar/bulk | 이벤트 일괄 생성 `{ events: [생성 본문, …] }` (1~50건, 한 트랜잭션 — 하나라도 틀리면 전부 저장 안 함) |
 | PUT | /calendar/:id | 이벤트 수정 |
-| DELETE | /calendar/:id?occurrenceDate=YYYY-MM-DD | 이벤트 삭제 (soft delete, 가상 이벤트는 원본 테이블 soft delete — 단 투자계좌만기는 계좌 자체가 아니라 `maturity_date`만 초기화, 공휴일은 삭제 불가). 반복 이벤트에서 `occurrenceDate`(클릭한 회차 날짜) 지정 시 그 회차부터 이후 반복만 중단(`recur_until` 조정)하고 이전 회차는 유지 — 첫 회차 지정 시 전체 삭제와 동일 |
+| DELETE | /calendar/:id?occurrenceDate=YYYY-MM-DD | 이벤트 삭제 (soft delete, 가상 이벤트는 원본 테이블 soft delete, 공휴일은 삭제 불가). 반복 이벤트에서 `occurrenceDate`(클릭한 회차 날짜) 지정 시 그 회차부터 이후 반복만 중단(`recur_until` 조정)하고 이전 회차는 유지 — 첫 회차 지정 시 전체 삭제와 동일 |
 
 > 공휴일 표시: `UserSettings.show_holidays` 켜져 있을 때만 응답에 포함. 공공데이터포털 특일 정보 API를 연도 단위로 캐싱(`HOLIDAY_API_KEY` 미설정 시 비활성).
 
@@ -194,7 +166,7 @@ Base URL: `http://localhost:8000/api/v1`
 | GET | /settings | 사용자 설정 조회 |
 | PUT | /settings | 사용자 설정 수정 |
 
-> soft delete된 항목(가계부/예적금/투자/구독/캘린더/계정)은 30일 경과 시 자동 영구삭제 크론(매일 3시)이 정리한다. 별도 복원 UI는 없다.
+> soft delete된 항목(가계부/예적금/구독/캘린더/계정)은 30일 경과 시 자동 영구삭제 크론(매일 3시)이 정리한다. 별도 복원 UI는 없다.
 
 ## 카테고리 관리
 
@@ -220,7 +192,7 @@ Base URL: `http://localhost:8000/api/v1`
 | --- | --- | --- |
 | GET | /dashboard/summary | 요약 — 이번 달 수입/지출·순자산·활성구독(`activeSubs` = 결제 중 + 체험, `trialSubs` = 그중 체험) + 최근 거래·다가오는 일정 |
 | GET | /dashboard/cashflow-forecast | 현금흐름 예측 — 활성 구독 + 반복 지출거래 월 환산·합산 |
-| GET | /dashboard/deadlines | 통합 D-day — 예적금만기·투자계좌만기(ISA 등)·구독결제 임박순 |
+| GET | /dashboard/deadlines | 통합 D-day — 예적금만기·구독결제 임박순 |
 
 ## 계정 보관함
 
@@ -291,7 +263,7 @@ Base URL: `http://localhost:8000/api/v1`
 
 | Method | Endpoint | 설명 |
 | --- | --- | --- |
-| GET | /system-logs?level=&category=&from=&to=&q=&page=&limit= | 크론/투자갱신 등 백그라운드 작업 실행 로그 목록 (본인 + 사용자 없는 전역 작업 로그만, 레벨·카테고리·기간·메시지 검색 + 페이지네이션, `limit` 1~100) |
+| GET | /system-logs?level=&category=&from=&to=&q=&page=&limit= | 크론 등 백그라운드 작업 실행 로그 목록 (본인 + 사용자 없는 전역 작업 로그만, 레벨·카테고리·기간·메시지 검색 + 페이지네이션, `limit` 1~100) |
 
 > `level`: info / warn / error · `category`: recurring_buy / recurring_tx / cron / asset / file / security / notification
 > 조회 전용(읽기 API만 존재) — 기록은 `SystemLogService.info/warn/error`를 각 서비스·크론이 직접 호출해 적재하며 실패해도 호출부 로직에 영향 없음(fire-and-forget). 90일 경과 항목은 소프트삭제 자동정리 크론(매일 03:00)이 함께 정리.

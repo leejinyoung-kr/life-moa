@@ -20,7 +20,7 @@ import { QueryRecurringScheduleDto } from './dto/query-recurring-schedule.dto';
 import { UpdateRecurringScheduleDto } from './dto/update-recurring-schedule.dto';
 import { RecurringScheduleService } from './recurring-schedule.service';
 
-// 자동이체 설정 — 반복거래/반복매수 데이터는 여기서 등록한 규칙에 따라 크론이 순수 생성만 한다
+// 자동이체 설정 — 반복거래 데이터는 여기서 등록한 규칙에 따라 크론이 순수 생성만 한다
 @ApiTags('자동이체 설정')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)

@@ -4,7 +4,7 @@
  */
 
 export type EvType = 'pay' | 'due' | 'exp' | 'task' | 'holiday';
-export type VirtSource = 'subscription' | 'saving' | 'investmentAccount' | 'holiday';
+export type VirtSource = 'subscription' | 'saving' | 'holiday';
 export type RecurFreq = 'none' | 'weekly' | 'monthly' | 'yearly';
 
 export interface CalEvent {
@@ -45,11 +45,10 @@ export const LUNAR_RECUR_FREQ_OPTIONS: { value: RecurFreq; label: string }[] = [
   { value: 'yearly', label: '매년' },
 ];
 
-// sourceType → 한글 라벨 + 원본 페이지 경로 (예적금 · 투자는 가계부의 그 탭)
+// sourceType → 한글 라벨 + 원본 페이지 경로 (예적금은 가계부의 그 탭)
 export const VIRT_SOURCE_META: Record<VirtSource, { label: string; path: string }> = {
   subscription:      { label: '구독',     path: '/subscriptions' },
   saving:            { label: '예적금',   path: '/transactions?tab=savings' },
-  investmentAccount: { label: '투자',     path: '/transactions?tab=invest' },
   holiday:           { label: '공휴일',   path: '' },
 };
 

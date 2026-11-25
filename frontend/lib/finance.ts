@@ -1,5 +1,5 @@
 /**
- * 가계부(수입/지출·예적금·투자) 공통 타입 · 라벨맵 · 포맷 유틸.
+ * 가계부(수입/지출·예적금) 공통 타입 · 라벨맵 · 포맷 유틸.
  * 백엔드 응답 DTO 와 1:1 대응한다.
  */
 
@@ -123,43 +123,16 @@ export interface SavingSummary {
   maturityNear: number;
 }
 
-export type InvestmentType =
-  | 'domestic_stock'
-  | 'foreign_stock'
-  | 'foreign_etf'
-  | 'domestic_etf'
-  | 'crypto'
-  | 'etc';
-
-export interface Investment {
-  id: number;
-  accountId: number; // 소속 투자 계좌(InvestmentAccount.id) — 예수금은 계좌 단위로 공유
-  name: string;
-  type: InvestmentType;
-  symbol: string | null; // 시세조회용 종목코드(국내) 또는 티커(해외)
-  quantity: number | null; // 보유수량 — 시세조회 시 단가와 곱해 평가금액 계산
-  principal: number;
-  principalUsd: number | null; // 해외종목 달러 원금 — 국내종목은 null
-  currentValue: number;
-  currentValueUsd: number | null; // 해외종목 달러 평가금액 — 국내종목은 null
-  profit: number;
-  profitRate: number;
-  purchaseDate: string | null;
-  memo: string | null;
-  updatedAt: string; // 평가금액 최근 수정 시각(ISO) — 시세 API 연동 전까지 수동 입력 신뢰도 표시용
-}
-
-// 자동이체 설정(자동 생성 규칙) — kind에 따라 거래/투자 전용 필드가 갈린다. GET /recurring-schedules 응답 DTO
+// 자동이체 설정(자동 생성 규칙) — 거래(kind=transaction). GET /recurring-schedules 응답 DTO
 export interface RecurringSchedule {
   id: number;
-  kind: 'transaction' | 'investment';
+  kind: 'transaction';
   rule: RecurringRule;
   startDate: string; // YYYY-MM-DD
   lastPeriod: string | null;
   active: boolean;
   nextRunDate: string | null; // 다음 실행(생성) 예정일 — 목록 표시용
 
-  // kind=transaction 전용
   txType: TransactionType | null;
   title: string | null;
   category: string | null;
@@ -168,35 +141,6 @@ export interface RecurringSchedule {
   memo: string | null;
   targetType: TransferTarget | null;
   targetId: number | null;
-
-  // kind=investment 전용
-  investmentId: number | null;
-  investmentName: string | null;
-  investmentSymbol: string | null;
-  buyAmount: number | null;
-  buyQuantity: number | null;
-}
-
-export interface InvestmentSummary {
-  totalValue: number;
-  totalPrincipal: number;
-  totalProfit: number;
-  profitRate: number;
-}
-
-// 투자 계좌 — 예수금을 보유하고 여러 종목(Investment)이 공유(예: ISA)
-export interface InvestmentAccount {
-  id: number;
-  name: string;
-  cashBalance: number;
-  cashBalanceUsd: number; // 달러 예수금 — 환전(원화↔달러)으로만 증감
-  accountNumber: string | null; // 마스킹된 형태로만 응답(예: 110••••7890)
-  startDate: string | null; // 가입일 — ISA 등 만기 기산일
-  maturityDate: string | null; // 만기일(예: ISA 3년) — 미입력 시 만기 알림 대상 아님
-  memo: string | null;
-  holdingsCount: number;
-  totalPrincipal: number;
-  totalCurrentValue: number;
 }
 
 // ── 라벨맵 (코드 ↔ 화면 표시) ────────────────────────────────────
@@ -206,10 +150,19 @@ export const TX_TYPE_LABEL: Record<TransactionType, string> = {
   transfer: '자산이동',
 };
 
+// investment 는 옛 투자 계좌 — 2026-11 투자 기능을 주식모아로 옮긴 뒤로는 새로 고를 수 없고, 옛 거래에 연결 없이 남는다 (ADR 0011)
 export const TRANSFER_TARGET_LABEL: Record<TransferTarget, string> = {
   saving: '예적금',
-  investment: '투자',
+  investment: '증권 계좌',
 };
+
+// 폼에서 고를 수 있는 이동 대상
+export const TRANSFER_TARGET_CHOICES: TransferTarget[] = ['saving'];
+
+// 폼에 채울 이동 대상 — 고를 수 없는 옛 대상(investment)은 「연동 없음」(빈 값)으로
+export function choosableTarget(t: TransferTarget | null | undefined): TransferTarget | '' {
+  return t && TRANSFER_TARGET_CHOICES.includes(t) ? t : '';
+}
 
 export const CYCLE_LABEL: Record<RecurringCycle, string> = {
   daily: '매일',
@@ -238,15 +191,6 @@ export const SAVING_TYPE_LABEL: Record<SavingType, string> = {
   savings: '적금',
   deposit: '예금',
   subscription: '청약',
-  etc: '기타',
-};
-
-export const INVEST_TYPE_LABEL: Record<InvestmentType, string> = {
-  domestic_stock: '국내주식',
-  foreign_stock: '해외주식',
-  foreign_etf: '해외ETF',
-  domestic_etf: '국내ETF',
-  crypto: '가상자산',
   etc: '기타',
 };
 

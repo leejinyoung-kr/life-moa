@@ -105,32 +105,6 @@ export class NotificationCronService {
         });
       }
 
-      // 2-1) ISA 등 투자 계좌 만기 D-30 / D-14 / D-7 / D-1
-      const isaAccounts = await this.prisma.investmentAccount.findMany({
-        where: {
-          user_id: userId,
-          deleted_at: null,
-          maturity_date: {
-            in: maturityReminderDays.map((d) => addDays(today, d)),
-          },
-        },
-      });
-      for (const a of isaAccounts) {
-        const daysLeft =
-          maturityReminderDays.find(
-            (d) =>
-              addDays(today, d).getTime() ===
-              new Date(a.maturity_date!).getTime(),
-          ) ?? 0;
-        n += await this.emit(userId, {
-          group: 'ledger',
-          tone: 'warning',
-          title: `${a.name} 만기 임박`,
-          description: `투자 계좌 만기가 ${daysLeft}일 남았습니다.`,
-          source: '투자',
-        });
-      }
-
       // 3) 구독 결제 D-1 / D-3 / D-7, 무료체험 종료 D-1 / D-3 / D-7 (매일 반복되지 않도록 정확히 해당 일자에만 발생)
       const reminderDays = [1, 3, 7];
       const subs = await this.prisma.subscription.findMany({

@@ -137,16 +137,11 @@ export class TransactionService {
       });
       if (!count && required)
         throw new BadRequestException('이동 대상 예적금을 찾을 수 없습니다.');
-    } else {
-      // target_id는 InvestmentAccount.id — 계좌 예수금에 누적(계좌 내 종목들이 공유)
-      const { count } = await tx.investmentAccount.updateMany({
-        where: { id: targetId, user_id: userId, deleted_at: null },
-        data: { cash_balance: { increment: signedAmount } },
-      });
-      if (!count && required)
-        throw new BadRequestException(
-          '이동 대상 투자 계좌를 찾을 수 없습니다.',
-        );
+    } else if (required) {
+      // 투자 계좌는 2026-11 주식모아로 옮기며 없어졌다 — 옛 거래는 target_id 가 비어 여기 오지 않는다 (ADR 0011)
+      throw new BadRequestException(
+        '투자 계좌로는 더 이상 연결할 수 없습니다.',
+      );
     }
   }
 

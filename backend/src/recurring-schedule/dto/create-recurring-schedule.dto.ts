@@ -3,6 +3,7 @@ import {
   IsBoolean,
   IsDateString,
   IsEnum,
+  IsIn,
   IsInt,
   IsNumber,
   IsObject,
@@ -12,7 +13,7 @@ import {
   ValidateIf,
 } from 'class-validator';
 
-// 자동이체(반복 자동 생성) 설정 추가 — kind에 따라 거래/투자 전용 필드가 갈린다
+// 자동이체(반복 자동 생성) 설정 추가 — kind 는 transaction 하나 (반복매수는 2026-11 투자 기능과 함께 뺐다, ADR 0011)
 export class CreateRecurringScheduleDto {
   @IsEnum(RecurringKind)
   kind: RecurringKind;
@@ -58,27 +59,12 @@ export class CreateRecurringScheduleDto {
   @MaxLength(300)
   memo?: string;
 
-  // 자산이동 누적 대상 종류 — txType='transfer'일 때만 의미, targetId와 함께 지정해야 자동 반영됨
+  // 자산이동 누적 대상 종류 — txType='transfer'일 때만 의미, targetId와 함께 지정해야 자동 반영됨. 새로 연결할 수 있는 것은 예적금뿐(투자 계좌는 없어졌다)
   @ValidateIf((o: CreateRecurringScheduleDto) => o.targetId !== undefined)
-  @IsEnum(TransferTarget)
+  @IsIn([TransferTarget.saving])
   targetType?: TransferTarget;
 
   @ValidateIf((o: CreateRecurringScheduleDto) => o.targetType !== undefined)
   @IsInt()
   targetId?: number;
-
-  // ── kind=investment 전용 ──
-  @ValidateIf((o: CreateRecurringScheduleDto) => o.kind === 'investment')
-  @IsInt()
-  investmentId?: number;
-
-  // 회차당 매수금액(국내: 원, 해외: 달러) — buyQuantity와 동시 사용 불가
-  @IsOptional()
-  @IsNumber()
-  buyAmount?: number;
-
-  // 회차당 매수수량(주) — buyAmount와 동시 사용 불가, 둘 중 하나만 입력
-  @IsOptional()
-  @IsNumber()
-  buyQuantity?: number;
 }

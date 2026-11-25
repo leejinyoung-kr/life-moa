@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const BACKEND_DIR = join(__dirname, '..', '..');
@@ -15,9 +15,11 @@ function sourceFiles(dir: string): string[] {
 // DB 시각은 KST 벽시계로 저장한다 (infra ADR 0008) — 하나라도 감싸지 않은 연결이 있으면 UTC 가 섞인다
 describe('DB 연결 (prisma)', () => {
   it('어댑터를 만드는 곳마다 withKstDateTime 으로 감싼다 — 앱 · 시드 · 데모 초기화 · 스크립트', () => {
-    const files = ['src', 'prisma', 'scripts'].flatMap((d) =>
-      sourceFiles(join(BACKEND_DIR, d)),
-    );
+    // scripts/ 는 일회성 스크립트가 있을 때만 생긴다
+    const files = ['src', 'prisma', 'scripts']
+      .map((d) => join(BACKEND_DIR, d))
+      .filter((d) => existsSync(d))
+      .flatMap((d) => sourceFiles(d));
     const made = files.filter((f) =>
       readFileSync(f, 'utf8').includes('new PrismaMariaDb('),
     );

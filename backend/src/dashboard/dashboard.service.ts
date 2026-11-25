@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { AssetService } from '../asset/asset.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { todayKst } from '../common/kst-date';
-import { PriceLookupService } from '../investment/price-lookup.service';
+import { ExchangeRateService } from '../exchange-rate/exchange-rate.service';
 
 // 주기별 금액을 월 단위로 환산 (yearly/12, weekly*52/12, daily는 평일만(연 261일)*261/12, monthly 그대로)
 function toMonthly(amount: number, cycle: string): number {
@@ -17,7 +17,7 @@ export class DashboardService {
   constructor(
     private prisma: PrismaService,
     private assetService: AssetService,
-    private priceLookup: PriceLookupService,
+    private exchangeRate: ExchangeRateService,
   ) {}
 
   // 대시보드 요약 — 이번 달 수입/지출·순자산·활성구독 + 최근거래·다가오는일정
@@ -114,7 +114,7 @@ export class DashboardService {
     // USD 구독이 하나라도 있을 때만 환율 조회 (구독 요약과 동일한 방식 — 행마다 호출하지 않고 1회만 재사용)
     const hasUsd = subs.some((s) => s.currency === 'USD');
     const usdToKrwRate = hasUsd
-      ? await this.priceLookup.getExchangeRate('USD', 'KRW')
+      ? await this.exchangeRate.getExchangeRate('USD', 'KRW')
       : 1;
 
     // 구독: USD면 원화 환산 후 주기 환산 (표시용 amount/currency는 원래 통화 유지)
@@ -169,12 +169,8 @@ export class DashboardService {
     until.setUTCDate(until.getUTCDate() + withinDays);
     const range = { gte: today, lte: until };
 
-    const [savings, isaAccounts, subs] = await Promise.all([
+    const [savings, subs] = await Promise.all([
       this.prisma.saving.findMany({
-        where: { user_id: userId, deleted_at: null, maturity_date: range },
-        select: { name: true, maturity_date: true },
-      }),
-      this.prisma.investmentAccount.findMany({
         where: { user_id: userId, deleted_at: null, maturity_date: range },
         select: { name: true, maturity_date: true },
       }),
@@ -192,7 +188,7 @@ export class DashboardService {
           DAY,
       );
     type Item = {
-      kind: 'saving' | 'investment' | 'subscription';
+      kind: 'saving' | 'subscription';
       title: string;
       date: string;
       dday: number;
@@ -203,12 +199,6 @@ export class DashboardService {
         title: `${s.name} 만기`,
         date: s.maturity_date!.toISOString().slice(0, 10),
         dday: dday(s.maturity_date!),
-      })),
-      ...isaAccounts.map((a) => ({
-        kind: 'investment' as const,
-        title: `${a.name} 만기`,
-        date: a.maturity_date!.toISOString().slice(0, 10),
-        dday: dday(a.maturity_date!),
       })),
       ...subs.map((s) => ({
         kind: 'subscription' as const,

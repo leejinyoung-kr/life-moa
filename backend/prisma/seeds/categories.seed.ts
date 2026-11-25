@@ -59,14 +59,6 @@ const CATEGORIES: CatSeed[] = [
   { domain: 'asset', code: 'investment',  label: '투자' },
   { domain: 'asset', code: 'etc',         label: '기타' },
 
-  // ── 투자 ────────────────────────────────
-  { domain: 'investment', code: 'domestic_stock', label: '국내주식' },
-  { domain: 'investment', code: 'foreign_stock',  label: '해외주식' },
-  { domain: 'investment', code: 'domestic_etf',   label: '국내ETF' },
-  { domain: 'investment', code: 'foreign_etf',    label: '해외ETF' },
-  { domain: 'investment', code: 'crypto',         label: '가상자산' },
-  { domain: 'investment', code: 'etc',            label: '기타' },
-
   // ── 예적금 ──────────────────────────────
   { domain: 'saving', code: 'savings',      label: '적금' },
   { domain: 'saving', code: 'deposit',      label: '예금' },

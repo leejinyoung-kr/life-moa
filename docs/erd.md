@@ -3,17 +3,15 @@
 > 단일 소스: `backend/prisma/schema.prisma` · DB: MariaDB(utf8mb4_unicode_ci)
 > 마이그레이션: `20260713000000_init`(전 도메인 통합) + `20260715104820_add_recurring_schedule` · `20260715105206_drop_legacy_recurring_columns` · `20260731121236_remove_note_task_calendar` · `20260801140000_restore_calendar_remove_goal` · `20260801225151_add_calendar_lunar` · `20260801233607_add_holiday_and_show_holidays` · `20260822225654_remove_trash_and_asset_realestate_debt`(휴지통 기능 삭제 + Asset 테이블/부동산·부채 제거) · `20261013141800_remove_env_identity_ai_security_score_features`(공개 준비 1단계: ENV 보관함·신원 지갑·AI 리포트·보안 점수 테이블과 관련 컬럼·enum 값 제거)
 
-## 테이블 목록 (25)
+## 테이블 목록 (24)
 
 | 테이블 | 설명 |
 | --- | --- |
 | User | 사용자 (Google OAuth) |
 | Transaction | 수입/지출 내역 |
-| RecurringSchedule | 자동이체 설정 (반복거래/반복매수 자동 생성 규칙 — 거래·투자 등록 폼과 분리) |
+| RecurringSchedule | 자동이체 설정 (반복거래 자동 생성 규칙 — 거래 등록 폼과 분리) |
 | TransactionFavorite | 거래 즐겨찾기 (자주 쓰는 수입/지출 — 오늘 날짜로 불러오기) |
 | Saving | 예적금 |
-| InvestmentAccount | 투자 계좌 (예수금 보유 — 종목 여러 개가 공유) |
-| Investment | 투자 종목 (소속 계좌의 예수금을 매수/매도로 전환) |
 | Subscription | 구독 서비스 |
 | NetWorthSnapshot | 순자산 월별 스냅샷 |
 | InvestmentSummary | 투자 합계 — 주식모아(따로 운영하는 투자 앱)에서 하루 한 번 받은 값, 사용자당 1행 (ADR 0011) |
@@ -30,14 +28,16 @@
 | PushSubscription | 웹 푸시 구독 (endpoint·p256dh·auth) |
 | RefreshToken | 갱신 토큰 화이트리스트 (jti, rotation/로그아웃/세션revoke 시 폐기) |
 | EmailLoginCode | 이메일 인증코드 로그인 (code_hash, expires_at, attempts) |
-| SystemLog | 시스템 로그 (크론·투자 현재가 갱신 등 백그라운드 작업 실행 기록, 90일 경과 시 자동 삭제) |
+| SystemLog | 시스템 로그 (크론 등 백그라운드 작업 실행 기록, 90일 경과 시 자동 삭제) |
 | JobRun | 예약 작업 실행 기록 (작업별 시작·종료·상태·요약·원본 에러·lease, 90일 경과 시 자동 삭제) |
 | OutboxMessage | 알림 발송 아웃박스 (알림 행과 같은 트랜잭션에 적재 → 커밋된 것만 발송, 멱등키·재시도·원본 에러, 끝난 행은 90일 경과 시 자동 삭제) |
+
+> 투자 계좌(`investment_account`) · 투자 종목(`investment`)은 2026-11 투자 기능을 주식모아로 옮기며 지웠다 — 마이그레이션 `20261125120000_remove_investments` 가 만기를 일반 일정으로 옮기고 자산이동 연결을 끊은 뒤 테이블을 지운다 (ADR 0011)
 
 ## 주요 관계
 
 ```text
-User 1 ─── N (Transaction, Saving, InvestmentAccount, Investment, Subscription, NetWorthSnapshot,
+User 1 ─── N (Transaction, Saving, Subscription, NetWorthSnapshot,
               Notification, CalendarEvent,
               LoginSession, Category, Credential,
               StorageFolder, StorageFile, AccessLog, RefreshToken, PushSubscription,
@@ -47,8 +47,6 @@ User 1 ─── 0..1 InvestmentSummary
 User 1 ─── N RecurringSchedule
 RecurringSchedule 1 ─── N Transaction(recurring_schedule_id, 자동 생성 회차)
 Subscription 1 ─── N Transaction(subscription_id, 결제일이 지나 자동 등록된 지출)
-Investment 1 ─── N RecurringSchedule(investment_id, kind=investment 전용)
-InvestmentAccount 1 ─── N Investment(account_id)
 StorageFolder  1 ─── N StorageFolder(parent_id, 자기참조) · N StorageFile
 LoginSession   1 ─── N RefreshToken(session_id, 세션을 지우면 NULL)
 LoginSession   1 ─── N PushSubscription(session_id, CASCADE — 세션 행이 지워지면 그 기기 구독도 같이 지워진다. 로그아웃 · 세션 종료 때 그 세션 구독을 지우는 것은 코드, README 「해결한 문제 5」)
@@ -61,24 +59,22 @@ LoginSession   1 ─── N PushSubscription(session_id, CASCADE — 세션 행
 이전 포맷 `v1:ivHex:tagHex:cipherHex`(`CREDENTIAL_SECRET` sha256, AAD 없음)는 부팅 시 v2 로 재암호화된다. 암호문 컬럼 목록은 `backend/src/crypto/crypto-fields.ts`.
 마스터 잠금 비번은 별도 scrypt 해시(`saltHex:hashHex`).
 
-- `Credential.password_enc`·`totp_enc`·`backup_codes_enc` · `InvestmentAccount.account_number_enc`
+- `Credential.password_enc`·`totp_enc`·`backup_codes_enc`
 
 ## 도메인별 요약
 
-### 가계부 — Transaction / Saving / InvestmentAccount / Investment
+### 가계부 — Transaction / Saving
 
-- `Transaction` — `type`(income/expense/transfer), `category`(소분류 code 저장 — 대분류는 Category.parent_code 로 파생), `amount`, `pay_method`, `recurring_schedule_id`(RecurringSchedule FK — 자동이체 설정으로 생성된 회차인 경우)·`recurring_period`(회차 식별), `target_type`(saving/investment)·`target_id` — transfer 거래가 가리키는 누적 대상(FK 아님, 지정 시 대상 잔액에 자동 반영. `investment` 대상은 `InvestmentAccount.id`를 가리킴), `subscription_id`(Subscription FK — 구독 자동 등록 내역. 지운 것 포함 같은 구독 · 같은 날짜가 있으면 다시 만들지 않는다), soft delete
-- `RecurringSchedule` — 자동이체(자동 생성) 설정. `kind`(transaction/investment), `rule`(JSON: cycle/day/month/weekendAdjust), `start_date`, `last_period`(중복 생성 방지), `active`(일시정지). `kind=transaction`이면 거래 생성에 필요한 `tx_type`·`title`·`category`·`amount`·`pay_method`·`memo`·`target_*` 필드 사용, `kind=investment`이면 `investment_id`(대상 종목 FK)·`buy_amount`·`buy_quantity` 사용. 등록/수정 폼과 별개로, 크론(`RecurringCronService`)이 이 규칙에 따라 거래/투자 데이터를 순수 생성만 한다
+- `Transaction` — `type`(income/expense/transfer), `category`(소분류 code 저장 — 대분류는 Category.parent_code 로 파생), `amount`, `pay_method`, `recurring_schedule_id`(RecurringSchedule FK — 자동이체 설정으로 생성된 회차인 경우)·`recurring_period`(회차 식별), `target_type`(saving/investment)·`target_id` — transfer 거래가 가리키는 누적 대상(FK 아님, 지정 시 대상 잔액에 자동 반영). 새로 연결할 수 있는 것은 `saving` 뿐 — `investment`(옛 투자 계좌 예수금)는 `target_id` 없이 남은 옛 거래 · 반복 설정에만 있다(화면에는 연결 없는 자산이동으로 보인다), `subscription_id`(Subscription FK — 구독 자동 등록 내역. 지운 것 포함 같은 구독 · 같은 날짜가 있으면 다시 만들지 않는다), soft delete
+- `RecurringSchedule` — 자동이체(자동 생성) 설정. `kind`(transaction — investment(반복매수)는 2026-11 뺐다), `rule`(JSON: cycle/day/month/weekendAdjust), `start_date`, `last_period`(중복 생성 방지), `active`(일시정지). `kind=transaction`이면 거래 생성에 필요한 `tx_type`·`title`·`category`·`amount`·`pay_method`·`memo`·`target_*` 필드 사용. 등록/수정 폼과 별개로, 크론(`RecurringCronService`)이 이 규칙에 따라 거래 데이터를 순수 생성만 한다
 - `TransactionFavorite` — 자주 쓰는 수입/지출 즐겨찾기. `type`(income/expense — transfer 는 DTO 에서 거부), `title`·`category`·`amount`(기본 금액)·`pay_method`·`memo`, `sort_order`(표시 순서). 날짜는 저장하지 않고, 고르면 오늘 날짜로 채운 추가 창을 연다. 유형·내역명·카테고리·결제수단이 같으면 중복으로 거부, 사용자당 50개까지. soft delete 없이 바로 삭제
 - `Saving` — `bank`(코드 관리 `bank` code — 2026-10-20 전에는 이름, [ADR 0009](adr/0009-code-management-values-stored-as-code.md)), `type`(savings/deposit/subscription/etc), `interest_rate`, `monthly_amount`, `maturity_date`, `balance`
-- `InvestmentAccount` — `name`(계좌명, 예: ISA·일반위탁), `cash_balance`(예수금 — 자산이동으로 충전, 매수/매도로 보유 종목과 전환. 계좌 내 종목들이 공유), `account_number_enc`(계좌번호, AES-256-GCM 암호화 — 동일 계좌명 다중 보유 시 구분용, 응답 시 마스킹), `start_date`·`maturity_date`(ISA 등 만기 — 둘 다 선택값, 생성 시 만기일 미입력하면 가입일+3년으로 자동 계산)
-- `Investment` — `account_id`(InvestmentAccount FK), `type`(domestic_stock/foreign_stock/foreign_etf/domestic_etf/crypto/etc), `principal`, `principal_usd`(해외종목 달러 원금 — 국내종목은 null), `current_value`, `purchase_date`
 
 ### 자산 — Subscription / NetWorthSnapshot / InvestmentSummary
 
-- `Subscription` — `category`(코드 관리 `subscription` code), `pay_method`(코드 관리 `pay_method` code — 2026-10-20 전에는 이름, ADR 0009), `currency`(KRW/USD), `cycle`(monthly/yearly/weekly), `status`(active/trial/paused), `next_payment_date`, `billing_day`(원래 결제일 1-31 — 말일로 줄어든 결제일을 다음 달에 되돌리는 기준, 결제일을 바꿔 저장할 때만 갱신), `auto_ledger`(가계부 자동 등록, 기본 켜짐), `last_used_at` — 지난 결제일은 매일 00:05 `subscription-roll-forward` 가 주기만큼 넘긴다(체험은 종료일이 지나면 active 로). `auto_ledger` 면 넘기면서 지나간 결제일마다 가계부 지출(카테고리 `insurance_subscription`)을 만든다 — 구독 등록 전 결제일은 제외, 일시정지를 풀 때는 지난 결제일을 먼저 오늘 이후로 넘긴다 — USD 구독은 요약 통계 계산 시 `PriceLookupService`(frankfurter.app)로 조회한 환율로 원화 환산
+- `Subscription` — `category`(코드 관리 `subscription` code), `pay_method`(코드 관리 `pay_method` code — 2026-10-20 전에는 이름, ADR 0009), `currency`(KRW/USD), `cycle`(monthly/yearly/weekly), `status`(active/trial/paused), `next_payment_date`, `billing_day`(원래 결제일 1-31 — 말일로 줄어든 결제일을 다음 달에 되돌리는 기준, 결제일을 바꿔 저장할 때만 갱신), `auto_ledger`(가계부 자동 등록, 기본 켜짐), `last_used_at` — 지난 결제일은 매일 00:05 `subscription-roll-forward` 가 주기만큼 넘긴다(체험은 종료일이 지나면 active 로). `auto_ledger` 면 넘기면서 지나간 결제일마다 가계부 지출(카테고리 `insurance_subscription`)을 만든다 — 구독 등록 전 결제일은 제외, 일시정지를 풀 때는 지난 결제일을 먼저 오늘 이후로 넘긴다 — USD 구독은 요약 통계 계산 시 `ExchangeRateService`(frankfurter.app)로 조회한 환율로 원화 환산
 - `NetWorthSnapshot` — `month`(YYYY-MM), `total_assets`(현금+예적금+투자 집계), `total_debt`(부동산/부채 기능 제거 이후로는 항상 0 — 과거 스냅샷의 기록값은 유지), `cash_total?`(그 달 말 기준 누적 현금 총액 캐시 — 자산 요약 API의 델타 계산 기준점, 과거 행은 null 허용) (`@@unique([user_id, month])`)
-- `InvestmentSummary` — `total_krw`(총 평가액 — 종목 평가 + 예수금, 세전, 원화 — 순자산 「투자」 한 줄), `net_deposit_krw`(원금 = 순입금), `quote_at?`(값에 든 시세 중 가장 오래된 받은 시각), `price_missing` · `fx_missing`(시세 · 환율이 빠진 값이 섞임), `fetched_at`(마지막으로 받은 시각 — 받기가 실패하면 그대로 남아 화면에 「n월 n일 기준」 으로 보인다) (`user_id` UNIQUE). 매일 00:50 `investment-summary` 가 주식모아 내부 API 에서 받아 덮어쓴다. 데모 · 로컬은 받지 않고 시드가 샘플 한 행을 넣는다
+- `InvestmentSummary` — `total_krw`(총 평가액 — 종목 평가 + 예수금, 세전, 원화 — 순자산 「투자」 한 줄), `net_deposit_krw`(원금 = 순입금), `quote_at?`(값에 든 시세 중 가장 오래된 받은 시각), `price_missing` · `fx_missing`(시세 · 환율이 빠진 값이 섞임), `fetched_at`(마지막으로 받은 시각 — 받기가 실패하면 그대로 남아 화면에 「11/25 00:50 기준」 처럼 보인다) (`user_id` UNIQUE). 매일 00:50 `investment-summary` 가 주식모아 내부 API 에서 받아 덮어쓴다. 데모 · 로컬은 받지 않고 시드가 샘플 한 행을 넣는다
 
 ### 설정 — UserSettings (1:1)
 
@@ -147,9 +143,9 @@ LoginSession   1 ─── N PushSubscription(session_id, CASCADE — 세션 행
 
 ## 타임스탬프
 
-시각(`DATETIME`) 컬럼 65개는 **KST 벽시계 값**이다 (2026-10-28 전환, infra ADR 0008). `PrismaService` 가 `@leejinyoung-kr/core-db` 의 `withKstDateTime` 으로 어댑터를 감싸 쓸 때 +9시간 · 읽을 때 −9시간 하므로, 앱 코드가 다루는 `Date` 는 그대로 올바른 시점이다. 시드 · 데모 초기화도 같은 감싸기를 쓴다 (`prisma.service.spec.ts` 가 검사).
+시각(`DATETIME`) 컬럼 63개는 **KST 벽시계 값**이다 (2026-10-28 전환, infra ADR 0008). `PrismaService` 가 `@leejinyoung-kr/core-db` 의 `withKstDateTime` 으로 어댑터를 감싸 쓸 때 +9시간 · 읽을 때 −9시간 하므로, 앱 코드가 다루는 `Date` 는 그대로 올바른 시점이다. 시드 · 데모 초기화도 같은 감싸기를 쓴다 (`prisma.service.spec.ts` 가 검사).
 
-- 날짜만 있는 `@db.Date` 컬럼(12개)은 원래 한국 날짜(UTC 자정으로 표현, `todayKst()`)라 바꾸지 않았다
+- 날짜만 있는 `@db.Date` 컬럼(9개)은 원래 한국 날짜(UTC 자정으로 표현, `todayKst()`)라 바꾸지 않았다
 - 전환 전 데이터는 마이그레이션 `20261028150000_datetime_to_kst` 가 한 트랜잭션으로 +9시간 옮겼다. 그 전 덤프(04시 자동 덤프 · PC `infra/backups/auto/` 2026-10-28 전)는 UTC 다. 복원한 뒤 `prisma migrate deploy` 를 돌리면 이 마이그레이션이 다시 적용된다 — UPDATE 를 손으로 돌리지 않는다 (infra 런북 db-dump-restore)
 - HeidiSQL 등으로 손으로 넣을 때도 KST 로 넣는다
 - 그 전 이력: TiDB Cloud 시절 트리거로 KST 를 강제하던 방식은 트리거 미지원으로 지웠고, 그 뒤 2026-10-28 까지는 UTC 였다

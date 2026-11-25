@@ -6,7 +6,7 @@ import {
   SubscriptionCycle,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { PriceLookupService } from '../investment/price-lookup.service';
+import { ExchangeRateService } from '../exchange-rate/exchange-rate.service';
 import { parsePage } from '@leejinyoung-kr/core-common';
 import { CreateSubscriptionDto } from './dto/create-subscription.dto';
 import { QuerySubscriptionDto } from './dto/query-subscription.dto';
@@ -36,7 +36,7 @@ function toMonthly(
 export class SubscriptionService {
   constructor(
     private prisma: PrismaService,
-    private priceLookup: PriceLookupService,
+    private exchangeRate: ExchangeRateService,
   ) {}
 
   // 엔티티 → 응답 DTO (Decimal→number, Date→문자열)
@@ -109,7 +109,7 @@ export class SubscriptionService {
     // USD 구독이 하나라도 있을 때만 환율 조회 (행마다 호출하지 않고 1회만 재사용)
     const hasUsd = billing.some((r) => r.currency === 'USD');
     const usdToKrwRate = hasUsd
-      ? await this.priceLookup.getExchangeRate('USD', 'KRW')
+      ? await this.exchangeRate.getExchangeRate('USD', 'KRW')
       : 1;
 
     const monthlyTotal = Math.round(

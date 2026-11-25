@@ -18,7 +18,8 @@ type TxSeed = {
   memo?: string;
   recurring?: boolean;
   weekendAdjust?: WeekendAdjust;
-  // 자산이동(transfer) 누적 대상 — 이름으로 지정, 시드 실행 시 해당 도메인 테이블에서 id를 조회해 연동(예적금/투자는 미리 시드되어 있어야 함)
+  // 자산이동(transfer) 누적 대상 — 예적금은 이름으로 지정해 시드 실행 시 id 를 조회해 연동(미리 시드되어 있어야 함).
+  // investment 는 운영의 옛 투자 계좌 자산이동과 같은 모양 — 대상 종류만 남고 연결 id 는 없다(ADR 0011)
   target?: { type: TransferTarget; name: string };
 };
 
@@ -26,9 +27,9 @@ type TxSeed = {
 function fixedRows(): TxSeed[] {
   return [
     { type: 'income',   date: '2026-01-25', title: '월급',          category: 'income_salary',          amount: 3200000, payMethod: 'bank_transfer', memo: '월 급여',       recurring: true, weekendAdjust: 'before' },
-    // 자산이동 — 예적금/투자로 자동 누적되는 거래(target). 시드 시 이름으로 해당 행을 조회해 연동
+    // 자산이동 — 예적금으로 자동 누적되는 거래(target, 이름으로 조회해 연동) · 증권 계좌로 보내는 거래(연결 없음)
     { type: 'transfer', date: '2026-01-30', title: '청약저축 납입',  category: 'transfer_move',          amount:  200000, payMethod: 'bank_transfer', memo: '잔액에서 자동 누적', recurring: true, weekendAdjust: 'none', target: { type: 'saving', name: '청약저축' } },
-    { type: 'transfer', date: '2026-01-20', title: 'ISA 예수금 적립', category: 'transfer_move',        amount:  200000, payMethod: 'bank_transfer', memo: '계좌 예수금으로 자동 누적', recurring: true, weekendAdjust: 'none', target: { type: 'investment', name: 'ISA' } },
+    { type: 'transfer', date: '2026-01-20', title: 'ISA 예수금 적립', category: 'transfer_move',        amount:  200000, payMethod: 'bank_transfer', memo: '증권 계좌로 이동', recurring: true, weekendAdjust: 'none', target: { type: 'investment', name: 'ISA' } },
     { type: 'expense',  date: '2026-01-29', title: '넷플릭스',       category: 'insurance_subscription', amount:   17000, payMethod: 'shinhan_card', memo: '월정액',        recurring: true, weekendAdjust: 'none' },
     { type: 'expense',  date: '2026-01-15', title: '휴대폰 요금',    category: 'insurance_telecom',      amount:   55000, payMethod: 'shinhan_card', memo: 'SKT 5G',        recurring: true, weekendAdjust: 'none' },
     { type: 'expense',  date: '2026-01-05', title: '실손보험료',     category: 'insurance_premium',      amount:   42000, payMethod: 'bank_transfer', memo: '월 보험료',     recurring: true, weekendAdjust: 'none' },
@@ -133,21 +134,17 @@ const VARIABLE: TxSeed[] = [
 ];
 
 // 한 사용자에게 수입/지출 더미를 채운다 (기존 행 제거 후 재삽입 → idempotent)
-// 자산이동(target) 거래는 예적금/투자 더미가 먼저 시드되어 있어야 이름으로 연동된다 (seed.ts 실행 순서 참고)
+// 자산이동(target) 거래는 예적금 더미가 먼저 시드되어 있어야 이름으로 연동된다 (seed.ts 실행 순서 참고)
 export const seedTransactions: SeedFn = async (prisma, userId) => {
   await prisma.transaction.deleteMany({ where: { user_id: userId } });
-  // 자동이체 설정도 지운다 — 거래만 지우면 다시 넣을 때마다 설정이 겹겹이 쌓인다(반복매수 설정은 종목 삭제 때 같이 지워진다)
-  await prisma.recurringSchedule.deleteMany({ where: { user_id: userId, kind: 'transaction' } });
+  // 자동이체 설정도 지운다 — 거래만 지우면 다시 넣을 때마다 설정이 겹겹이 쌓인다
+  await prisma.recurringSchedule.deleteMany({ where: { user_id: userId } });
 
-  // target_type='investment'는 종목(Investment)이 아닌 투자 계좌(InvestmentAccount)를 가리킴(예수금은 계좌 단위)
-  const [savings, investmentAccounts] = await Promise.all([
-    prisma.saving.findMany({ where: { user_id: userId }, select: { id: true, name: true } }),
-    prisma.investmentAccount.findMany({ where: { user_id: userId }, select: { id: true, name: true } }),
-  ]);
+  const savings = await prisma.saving.findMany({ where: { user_id: userId }, select: { id: true, name: true } });
+  // 예적금 이름 → id. investment(증권 계좌)는 연결하지 않는다
   function targetIdOf(target?: { type: TransferTarget; name: string }): number | null {
-    if (!target) return null;
-    const list = target.type === 'saving' ? savings : investmentAccounts;
-    return list.find((r) => r.name === target.name)?.id ?? null;
+    if (!target || target.type !== 'saving') return null;
+    return savings.find((r) => r.name === target.name)?.id ?? null;
   }
 
   // 날짜를 실행일 기준으로 옮기고, 옮겨서 오늘 이후가 된 변동 거래는 뺀다(반복 거래 첫 회차는 다섯 달 전이라 늘 남는다).
@@ -158,7 +155,7 @@ export const seedTransactions: SeedFn = async (prisma, userId) => {
   let count = 0;
   for (const t of rows) {
     const targetId = targetIdOf(t.target);
-    const targetType = targetId != null ? t.target!.type : null;
+    const targetType = targetId != null || t.target?.type === 'investment' ? t.target!.type : null;
     // 반복 거래 회차: 첫 회차부터 오늘까지 매월. 원래는 예약 작업(매일 9시)이 채우지만, 시드 직후 이번 달 고정지출이 비지 않게 여기서 넣는다
     const dates = [t.date];
     if (t.recurring) {

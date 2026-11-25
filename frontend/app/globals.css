@@ -312,11 +312,6 @@ tbody td { height: 48px; padding: 6px 12px; color: var(--text-primary); vertical
 .savings-meta-value.accent { color: var(--accent); }
 .savings-meta-value.warning { color: var(--warning); font-weight: 600; }
 
-/* 투자 탭 */
-.return-pill { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: var(--radius-full); font-size: .75rem; font-weight: 700; font-family: var(--font-mono); }
-.return-pill.up { background: var(--success-dim); color: var(--success); }
-.return-pill.down { background: var(--danger-dim); color: var(--danger); }
-
 /* 추가/수정 모달 — 비밀번호 강도 */
 .input-mono { font-family: var(--font-code); }
 

@@ -188,7 +188,6 @@ const VIRT_OFFSET = {
   subscription: 1_000_000,
   saving: 2_000_000,
   holiday: 4_000_000,
-  investmentAccount: 5_000_000,
 };
 type VirtSource = keyof typeof VIRT_OFFSET;
 
@@ -196,11 +195,6 @@ type VirtSource = keyof typeof VIRT_OFFSET;
 function decodeVirtId(
   id: number,
 ): { sourceType: VirtSource; sourceId: number } | null {
-  if (id >= VIRT_OFFSET.investmentAccount)
-    return {
-      sourceType: 'investmentAccount',
-      sourceId: id - VIRT_OFFSET.investmentAccount,
-    };
   if (id >= VIRT_OFFSET.holiday)
     return { sourceType: 'holiday', sourceId: id - VIRT_OFFSET.holiday };
   if (id >= VIRT_OFFSET.saving)
@@ -283,12 +277,12 @@ export class CalendarService {
     };
   }
 
-  // 구독·예적금·투자계좌 테이블에서 가상 이벤트 수집 (dateFilter 없으면 전체)
+  // 구독·예적금 테이블에서 가상 이벤트 수집 (dateFilter 없으면 전체). 투자계좌 만기는 2026-11 일반 일정으로 옮겼다 (ADR 0011)
   private async virtualEvents(
     userId: number,
     dateFilter?: { gte: Date; lt?: Date },
   ): Promise<CalEventDto[]> {
-    const [subs, savings, isaAccounts] = await Promise.all([
+    const [subs, savings] = await Promise.all([
       this.prisma.subscription.findMany({
         where: {
           user_id: userId,
@@ -304,14 +298,6 @@ export class CalendarService {
         },
       }),
       this.prisma.saving.findMany({
-        where: {
-          user_id: userId,
-          deleted_at: null,
-          maturity_date: { not: null, ...(dateFilter ?? {}) },
-        },
-        select: { id: true, name: true, maturity_date: true },
-      }),
-      this.prisma.investmentAccount.findMany({
         where: {
           user_id: userId,
           deleted_at: null,
@@ -347,18 +333,6 @@ export class CalendarService {
         memo: null,
         virtual: true,
         sourceType: 'saving',
-      });
-    });
-    isaAccounts.forEach((a) => {
-      if (!a.maturity_date) return;
-      result.push({
-        id: VIRT_OFFSET.investmentAccount + a.id,
-        date: toDateStr(a.maturity_date),
-        type: 'due',
-        title: `${a.name} 만기`,
-        memo: null,
-        virtual: true,
-        sourceType: 'investmentAccount',
       });
     });
 
@@ -669,13 +643,6 @@ export class CalendarService {
         await this.prisma.saving.updateMany({
           where: { id: sourceId, user_id: userId },
           data: { deleted_at: now },
-        });
-        break;
-      case 'investmentAccount':
-        // 계좌 자체는 보유 종목이 있으면 삭제가 막혀있으므로(investment-account.service.remove), 여기서는 만기일만 제거
-        await this.prisma.investmentAccount.updateMany({
-          where: { id: sourceId, user_id: userId },
-          data: { maturity_date: null },
         });
         break;
     }

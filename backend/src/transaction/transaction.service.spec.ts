@@ -7,7 +7,6 @@ import { TransactionService } from './transaction.service';
 describe('TransactionService (자산이동 연동)', () => {
   let txs: any[];
   let savings: any[];
-  let investmentAccounts: any[];
   let seq: number;
   let prisma: any;
 
@@ -35,9 +34,9 @@ describe('TransactionService (자산이동 연동)', () => {
 
   beforeEach(() => {
     txs = [];
-    savings = [{ id: 1, user_id: 1, deleted_at: null, balance: dec(10000) }];
-    investmentAccounts = [
-      { id: 1, user_id: 1, deleted_at: null, cash_balance: dec(10000) },
+    savings = [
+      { id: 1, user_id: 1, deleted_at: null, balance: dec(10000) },
+      { id: 2, user_id: 1, deleted_at: null, balance: dec(10000) },
     ];
     seq = 1;
 
@@ -95,18 +94,6 @@ describe('TransactionService (자산이동 연동)', () => {
           return { count: matched.length };
         }),
       },
-      investmentAccount: {
-        updateMany: jest.fn(async ({ where, data }: any) => {
-          const matched = investmentAccounts.filter(
-            (a) =>
-              a.id === where.id &&
-              a.user_id === where.user_id &&
-              a.deleted_at == null,
-          );
-          for (const row of matched) applyData(row, data);
-          return { count: matched.length };
-        }),
-      },
       category: { findMany: jest.fn(async () => []) },
       $transaction: jest.fn(async (arg: any) =>
         Array.isArray(arg) ? Promise.all(arg) : arg(prisma),
@@ -132,12 +119,13 @@ describe('TransactionService (자산이동 연동)', () => {
       expect(savings[0].balance.toNumber()).toBe(15000);
     });
 
-    it('investment 대상이면 계좌 예수금 증가', async () => {
-      await svc().create(
-        1,
-        baseDto({ targetType: 'investment', targetId: 1 }) as any,
-      );
-      expect(investmentAccounts[0].cash_balance.toNumber()).toBe(15000);
+    it('investment 대상이면 BadRequest — 투자 계좌는 주식모아로 옮기며 없어졌다', async () => {
+      await expect(
+        svc().create(
+          1,
+          baseDto({ targetType: 'investment', targetId: 1 }) as any,
+        ),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('존재하지 않는 이동 대상이면 BadRequest (필수 반영)', async () => {
@@ -180,11 +168,33 @@ describe('TransactionService (자산이동 연동)', () => {
         baseDto({ targetType: 'saving', targetId: 1 }) as any,
       );
       await svc().update(1, created.id, {
-        targetType: 'investment',
-        targetId: 1,
+        targetType: 'saving',
+        targetId: 2,
       } as any);
       expect(savings[0].balance.toNumber()).toBe(10000);
-      expect(investmentAccounts[0].cash_balance.toNumber()).toBe(15000);
+      expect(savings[1].balance.toNumber()).toBe(15000);
+    });
+
+    it('옛 투자 계좌 자산이동(연결 id 없음)은 금액을 고쳐도 아무 잔액도 건드리지 않는다', async () => {
+      txs.push({
+        id: seq++,
+        user_id: 1,
+        deleted_at: null,
+        type: 'transfer',
+        date: new Date('2026-06-01'),
+        title: 'ISA 예수금 적립',
+        category: 'transfer',
+        amount: dec(5000),
+        pay_method: '',
+        memo: null,
+        recurring_schedule_id: null,
+        subscription_id: null,
+        target_type: 'investment',
+        target_id: null,
+      });
+      await svc().update(1, txs[0].id, { amount: 8000 });
+      expect(Number(String(txs[0].amount))).toBe(8000);
+      expect(savings.map((x) => x.balance.toNumber())).toEqual([10000, 10000]);
     });
 
     it('타인 소유 내역은 NotFound', async () => {
@@ -232,12 +242,12 @@ describe('TransactionService (자산이동 연동)', () => {
       );
       const b = await svc().create(
         1,
-        baseDto({ targetType: 'investment', targetId: 1 }) as any,
+        baseDto({ targetType: 'saving', targetId: 2 }) as any,
       );
       const res = await svc().removeMany(1, [a.id, b.id]);
       expect(res.count).toBe(2);
       expect(savings[0].balance.toNumber()).toBe(10000);
-      expect(investmentAccounts[0].cash_balance.toNumber()).toBe(10000);
+      expect(savings[1].balance.toNumber()).toBe(10000);
     });
 
     it('같은 대상 행은 금액을 합쳐 한 번만 역반영하고, 삭제 표시도 한 번에', async () => {

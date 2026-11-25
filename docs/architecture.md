@@ -10,9 +10,9 @@
 | --- | --- | --- |
 | Frontend | Next.js 16.2 (App Router), React 19, TypeScript, Tailwind CSS v4 | 구현 완료 |
 | 상태관리 | TanStack Query (React Query) — lib/query·queryKeys | 전 페이지 전환 완료 |
-| Backend | NestJS 11, TypeScript | 29개 모듈 구현 완료 (AppModule 제외, prisma · crypto-audit 포함. `/_meta` 는 코어 MetaModule) |
+| Backend | NestJS 11, TypeScript | 28개 모듈 구현 완료 (AppModule 제외, prisma · crypto-audit 포함. `/_meta` 는 코어 MetaModule) |
 | ORM | Prisma | 구현 완료 |
-| DB | MariaDB 11 | 26개 테이블 구현 완료 |
+| DB | MariaDB 11 | 24개 테이블 구현 완료 |
 | Auth | Google OAuth 2.0 + JWT (전역 가드 + 새 기기 감지) | 구현 완료 |
 | Rate-limit | @nestjs/throttler | 구현 완료 |
 | 암호화 | AES-256-GCM(`CRYPTO_KEYS` 키링 + 필드·사용자 AAD, 부팅 시 자동 재암호화, 암호문 컬럼 평문 저장은 Prisma 쓰기 가드가 차단) / 마스터잠금 scrypt | 구현 완료 |
@@ -111,7 +111,8 @@ flowchart LR
 | backend → SMTP | `mail/` · `env.ts` `SMTP_*` (비면 꺼짐) |
 | backend → 푸시 서비스 | `push/webpush.channel.ts` · `push/dto/subscribe.dto.ts`(endpoint 허용 주소) · `env.ts` `VAPID_*` |
 | backend → 공휴일 API | `holiday/holiday.service.ts` (`apis.data.go.kr`) |
-| backend → 시세 · 환율 | `investment/price-lookup.service.ts` (네이버 · Yahoo · Frankfurter) |
+| backend → 환율 | `exchange-rate/exchange-rate.service.ts` (Frankfurter — 달러 구독 원화 환산 · 대시보드) |
+| backend → 주식모아 | `asset/investment-summary.service.ts` (내부 API, 홈서버 컨테이너끼리 — `env.ts` `STOCKMOA_INTERNAL_*`, 비면 꺼짐) |
 | GitHub → 홈서버 | `.github/workflows/deploy-home-server.yml` (`runs-on: self-hosted`, `NPM_READ_TOKEN`) |
 
 ## 데모 인스턴스
@@ -130,13 +131,12 @@ flowchart LR
 | auth | /auth | 구현 완료 |
 | transaction | /transactions | 구현 완료 |
 | transaction-favorite | /transaction-favorites | 구현 완료 |
-| recurring-schedule | /recurring-schedules (자동이체 설정 — 반복거래 · 반복매수 규칙. 회차는 크론이 이 규칙대로 만든다) | 구현 완료 |
+| recurring-schedule | /recurring-schedules (자동이체 설정 — 반복거래 규칙. 회차는 크론이 이 규칙대로 만든다) | 구현 완료 |
 | saving | /savings | 구현 완료 |
-| investment-account | /investment-accounts | 구현 완료 |
-| investment | /investments | 구현 완료 |
+| exchange-rate | (환율 조회 — 구독 · 대시보드 · 예약 작업이 같이 쓴다. 2026-11 옛 투자 시세 조회에서 떼어 냈다) | 구현 완료 |
 | subscription | /subscriptions | 구현 완료 |
 | asset | /assets (순자산 요약/추이 — 현금+예적금+투자 집계. 투자는 주식모아에서 받은 합계 `investment_summary`, ADR 0011) | 구현 완료 |
-| calendar | /calendar (실제 일정 + 구독결제·예적금만기·투자계좌만기 가상 이벤트) | 구현 완료 |
+| calendar | /calendar (실제 일정 + 구독결제·예적금만기 가상 이벤트) | 구현 완료 |
 | holiday | (컨트롤러 없음 — 공휴일 · 대체공휴일 조회 · 연도별 캐시, calendar · 크론이 쓴다) | 구현 완료 |
 | notification | /notifications (알림 인박스. 알림 생성과 웹푸시 적재를 한 트랜잭션으로 묶는다 — `createWithPush`) | 구현 완료 |
 | security | /security (로그인 세션 + 마스터잠금 Vault. 열람 기록은 `/security/access-logs`) | 구현 완료 |
@@ -149,10 +149,10 @@ flowchart LR
 | file | /files (Backblaze B2) | 구현 완료 |
 | export | /export | 구현 완료 |
 | import | /import | 구현 완료 |
-| maintenance | (크론 9개 — 알림·반복거래/반복매수 국내·해외(투자 현재가 갱신 포함)·주식모아 투자 합계 받기·순자산 스냅샷·DB 백업·구독 결제일 갱신·공휴일 사전 캐싱·소프트삭제 항목 자동정리) | 구현 완료 |
+| maintenance | (크론 8개 — 알림·반복거래·주식모아 투자 합계 받기·순자산 스냅샷·DB 백업·구독 결제일 갱신·공휴일 사전 캐싱·소프트삭제 항목 자동정리) | 구현 완료 |
 | mail | (SMTP 메일 발송 — 이메일 코드 로그인 등, 미설정 시 no-op) | 구현 완료 |
 | push | /push (웹 푸시 구독/발송 — VAPID + 발송 아웃박스: 커밋된 것만 발송·멱등키·재시도·원본 에러 보존) | 구현 완료 |
-| system-log | /system-logs (백그라운드 작업 실행 로그 — 크론·투자 현재가 갱신 등, 조회 전용) | 구현 완료 |
+| system-log | /system-logs (백그라운드 작업 실행 로그 — 크론 등, 조회 전용) | 구현 완료 |
 | health | /health (헬스체크 — 공개, DB 핑) | 구현 완료 |
 | prisma · crypto-audit | (컨트롤러 없음 — DB 연결(core-db KST 감싸기 · 암호문 쓰기 가드), 부팅 시 암호문 점검 · 재암호화) | 구현 완료 |
 | meta | /_meta (운영 상태 — 빌드 커밋·설치된 코어 패키지 버전 + 예약 작업 마지막 성공·아웃박스 적체·켜진 알림 채널. 경고는 `warn` 한자리에. 로그인 필요) | 구현 완료 |
@@ -171,13 +171,12 @@ flowchart LR
 | 일정 | 작업 이름 · lease | 파일 | 내용 |
 | --- | --- | --- | --- |
 | 매일 00:05 | `subscription-roll-forward` · 5분 | subscription-cron.service.ts | 결제일(`next_payment_date`)이 오늘(KST)보다 지난 구독을 주기(월/연/주)만큼 넘겨 오늘 이후 첫 결제일로 갱신. 월/연 주기는 원래 결제일(`billing_day`)로 맞추고 그 달에 없으면 말일로 — 31일 결제는 2/28 → 3/31 로 되돌아간다(`billing-date.util.ts`). 체험(`trial`)은 종료일이 지나면 유료 전환으로 보고 `active` 로 바꾸고, 일시정지(`paused`)는 건드리지 않는다. 가계부 자동 등록(`auto_ledger`)이 켜진 구독은 같은 트랜잭션에서 지나간 결제일마다 지출 내역(`subscription_id` 연결, 지운 것 포함 같은 날짜는 건너뜀)을 만든다 — 밤늦게 결제되는 구독이 있어 당일이 아니라 다음 날 넣는다. USD 는 그날 환율로 원화 환산(메모에 원래 금액 · 환율), 환율 조회가 실패하면 그 구독은 결제일도 넘기지 않고 실행을 실패로 마감해 다음 날 다시 한다. 09:00 결제 알림보다 먼저 돈다 |
-| 매일 03:00 | `trash-purge` · 10분 | trash-cron.service.ts | soft-delete 후 30일 경과 항목 영구삭제 (거래·예적금·투자·구독·캘린더·계정) + 시스템 로그·작업 실행 기록·끝난 알림 발송(`outbox_message` sent · failed) 90일 경과분 삭제. 휴지통 UI는 없으며 삭제된 항목은 이 크론으로만 정리됨. 테이블 하나가 실패해도 나머지는 계속 지우고 끝에 실패로 마감 |
+| 매일 03:00 | `trash-purge` · 10분 | trash-cron.service.ts | soft-delete 후 30일 경과 항목 영구삭제 (거래·예적금·구독·캘린더·계정) + 시스템 로그·작업 실행 기록·끝난 알림 발송(`outbox_message` sent · failed) 90일 경과분 삭제. 휴지통 UI는 없으며 삭제된 항목은 이 크론으로만 정리됨. 테이블 하나가 실패해도 나머지는 계속 지우고 끝에 실패로 마감 |
 | 매일 04:00 | `db-backup` · 30분 | db-backup-cron.service.ts | `mariadb-dump` → gzip 압축 후 `backups/`에 저장, 30일 경과 백업 자동 삭제. 실패하면 쓰다 만 파일을 지운다. lease 가 끝나면 `mariadb-dump` 도 함께 종료(signal) |
-| 매일 09:00 | `notification-daily` · 10분 | notification-cron.service.ts | 사용자별 알림 생성(예적금·투자계좌 만기 D-30/14/7/1, 구독결제/체험종료 D-7/3/1, 비번회전 90일 경과 후 30일 간격 재알림) + 웹푸시 발송. 매일 반복 알림을 막기 위해 해당 일자에 정확히 일치할 때만 생성. 만기 알림은 설정(`notifMaturity`), 비번회전 알림은 설정(`notifPwRotation`)으로 토글 가능 |
-| 매일 09:00 | `recurring-domestic` · 30분 | recurring-cron.service.ts (`run`) | 반복거래(국내, `transaction.service.ts`의 `materializeRecurring`)는 매일 실행. 반복매수(국내, `investment.service.ts`의 `materializeRecurringBuys`) + 국내 투자 종목 현재가 갱신(`refreshCurrentValues`)은 실제 증권시장이 열리는 평일(KST 기준, `isWeekdayKST()`)에만 실행하고 주말엔 건너뜀. 전체 사용자를 순회하며, 사용자별 실패는 시스템 로그에 남기고 계속 진행한 뒤 실행은 실패로 마감. 반복거래/반복매수는 서로 독립적으로 처리 건수를 집계해 완료 로그도 따로 남기며, 처리한 항목이 0건이고 실패도 없으면 그 로그는 남기지 않는다. 반복매수는 종목별로 외부 시세조회 API(네이버/야후)를 호출하므로 3종목씩 묶어 묶음 사이 3초 대기(현재가 갱신은 5종목씩 2초 대기) |
-| 매일 23:00 | `recurring-foreign` · 30분 | recurring-cron.service.ts (`runForeign`) | 반복매수(해외 — foreign_stock/foreign_etf) 회차 일괄 생성 + 해외 투자 종목 현재가 갱신. 미국 장이 열린 직후 실시간 가격으로 매수하도록 국내 배치와 시간을 분리. 평일(KST 기준)에만 실행하고 주말엔 건너뜀(실행 기록 요약에만 `주말 — 건너뜀`). 처리한 반복매수가 0건이고 실패도 없으면 완료 로그를 남기지 않는다 |
+| 매일 09:00 | `notification-daily` · 10분 | notification-cron.service.ts | 사용자별 알림 생성(예적금 만기 D-30/14/7/1, 구독결제/체험종료 D-7/3/1, 비번회전 90일 경과 후 30일 간격 재알림) + 웹푸시 발송. 매일 반복 알림을 막기 위해 해당 일자에 정확히 일치할 때만 생성. 만기 알림은 설정(`notifMaturity`), 비번회전 알림은 설정(`notifPwRotation`)으로 토글 가능 |
+| 매일 09:00 | `recurring-domestic` · 30분 | recurring-cron.service.ts (`run`) | 반복거래(`transaction.service.ts`의 `materializeRecurring`)를 매일 실행. 전체 사용자를 순회하며, 사용자별 실패는 시스템 로그에 남기고 계속 진행한 뒤 실행은 실패로 마감. 처리한 항목이 0건이고 실패도 없으면 완료 로그를 남기지 않는다. 작업 이름은 실행 기록이 이어지게 반복매수(국내)를 같이 하던 때 그대로 — 반복매수(국내 · 해외 `recurring-foreign`)와 투자 현재가 갱신은 2026-11 투자 기능과 함께 뺐다 (ADR 0011) |
 | 매일 00:50 | `investment-summary` · 5분 | investment-summary-cron.service.ts | 사용자마다 주식모아 내부 API(`STOCKMOA_INTERNAL_URL` + `/api/v1/internal/summary`, 내부 토큰 · `X-User-Email` 헤더)에서 투자 합계를 받아 `investment_summary` 에 덮어쓴다 — 01:00 순자산 스냅샷이 그 값을 찍는다. 주식모아에 없는 사용자(「사용자 없음」 404)는 건너뛰고, 그 밖의 실패는 마지막 값을 두고 시스템 로그(`asset`)에 남긴 뒤 실행을 실패로 마감. 주소 · 토큰이 없으면(로컬 · 데모) 건너뜀. 부팅 때도 마지막으로 받은 지 20시간이 넘었으면 한 번 받는다 — 배포 직후 「투자」 가 비지 않게 (ADR 0011) |
-| 매일 01:00 | `net-worth-snapshot` · 10분 | net-worth-snapshot-cron.service.ts | 사용자별 **어제가 속한 달**(YYYY-MM) 이름으로 지금 총자산(현금+예적금+투자)·현금 총액(`cash_total`)을 upsert — 같은 달엔 매일 덮어써서 다음 달 1일 새벽 저장이 월말 값이 된다(예적금·투자는 이력이 없어 지금 값만 찍을 수 있으므로 이름표는 찍은 시점의 달). `total_debt`는 부동산/부채 기능 제거 이후 항상 0, 과거 기록값은 유지. `cash_total`(현금 = 수입 − 지출 − 자산이동)은 자산 요약 API(`/assets/summary`)가 전체 거래를 매번 재집계하지 않고 직전 월말 스냅샷 + 이후 거래 델타로 계산하는 기준점. 2026-10-14 전에는 매주 월요일에 지난달 이름으로 지금 값을 덮어써 이름표가 한 달 밀렸다 — 마이그레이션 `20261014090000_fix_net_worth_snapshot_label_and_cash` 가 바로잡음 |
+| 매일 01:00 | `net-worth-snapshot` · 10분 | net-worth-snapshot-cron.service.ts | 사용자별 **어제가 속한 달**(YYYY-MM) 이름으로 지금 총자산(현금+예적금+투자)·현금 총액(`cash_total`)을 upsert — 같은 달엔 매일 덮어써서 다음 달 1일 새벽 저장이 월말 값이 된다(예적금 · 받은 투자 합계는 이력이 없어 지금 값만 찍을 수 있으므로 이름표는 찍은 시점의 달). `total_debt`는 부동산/부채 기능 제거 이후 항상 0, 과거 기록값은 유지. `cash_total`(현금 = 수입 − 지출 − 자산이동)은 자산 요약 API(`/assets/summary`)가 전체 거래를 매번 재집계하지 않고 직전 월말 스냅샷 + 이후 거래 델타로 계산하는 기준점. 2026-10-14 전에는 매주 월요일에 지난달 이름으로 지금 값을 덮어써 이름표가 한 달 밀렸다 — 마이그레이션 `20261014090000_fix_net_worth_snapshot_label_and_cash` 가 바로잡음 |
 | 매월 1일 02:00 | `holiday-prefetch` · 5분 | holiday-cron.service.ts | 올해·내년 공휴일을 미리 캐싱(공공데이터포털 특일 정보 API) — 캘린더를 열 때 외부 호출이 없게 한다 |
 
 > 작업별 실행 기록은 `job_run` 테이블(시작·종료·상태·요약·원본 에러)에, 사용자에게 보여줄 완료·실패는 `SystemLogService`를 통해 `/system-logs`(`/logs` 화면)에도 기록된다. 실행 기록이 실패로 마감되면 `/logs` 에 `예약 작업 실패: <작업>` 이 남는다.

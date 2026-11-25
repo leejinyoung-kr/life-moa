@@ -37,7 +37,7 @@ export default function MobileCard({ checked, onCheck, icon, title, sub, aside, 
   aside?: ReactNode;
   /** 머리 아래 이름표 · 값 줄 — 값이 null · undefined · '' 인 줄은 뺀다 */
   fields?: MobileField[];
-  /** 같은 폭 버튼 줄 — 배열의 배열이면 여러 줄 (투자: 매수 · 매도 / 복사 · 수정 · 삭제) */
+  /** 같은 폭 버튼 줄 — 배열의 배열이면 여러 줄 (예: 위 줄 주요 동작 / 아래 줄 복사 · 수정 · 삭제) */
   actions?: MobileAction[] | MobileAction[][];
   /** 이름표 줄 대신(또는 아래에) 넣는 자유 내용 */
   children?: ReactNode;

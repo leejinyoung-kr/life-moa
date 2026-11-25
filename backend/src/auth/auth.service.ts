@@ -638,7 +638,6 @@ export class AuthService {
     await this.prisma.$transaction([
       this.prisma.transaction.deleteMany(w),
       this.prisma.saving.deleteMany(w),
-      this.prisma.investment.deleteMany(w),
       this.prisma.subscription.deleteMany(w),
       this.prisma.netWorthSnapshot.deleteMany(w),
       this.prisma.userSettings.deleteMany(w),

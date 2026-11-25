@@ -29,10 +29,10 @@ interface Forecast {
   items: { name: string; kind: 'subscription' | 'recurring'; cycle: string; amount: number; currency: 'KRW' | 'USD'; monthly: number }[];
 }
 
-type DeadlineKind = 'saving' | 'investment' | 'subscription' | 'task';
+type DeadlineKind = 'saving' | 'subscription' | 'task';
 interface Deadline { kind: DeadlineKind; title: string; date: string; dday: number }
-const DEADLINE_MARKER: Record<DeadlineKind, EvType> = { saving: 'due', investment: 'due', subscription: 'pay', task: 'task' };
-const DEADLINE_LABEL: Record<DeadlineKind, string> = { saving: '예적금', investment: '투자', subscription: '구독', task: '할일' };
+const DEADLINE_MARKER: Record<DeadlineKind, EvType> = { saving: 'due', subscription: 'pay', task: 'task' };
+const DEADLINE_LABEL: Record<DeadlineKind, string> = { saving: '예적금', subscription: '구독', task: '할일' };
 const EV_LABEL: Record<EvType, string> = { pay: '결제', due: '만기', exp: '만료', task: '할일' };
 
 // 종류별 표식 모양 — 색만으로 구분하지 않도록 모양(원 · 네모 · 마름모 · 빈 원)을 다르게 한다

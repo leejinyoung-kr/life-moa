@@ -1,6 +1,6 @@
 /**
  * 시스템 로그(SystemLog) 더미.
- * 카테고리(cron·recurring_buy·recurring_tx·asset·notification·file)와 레벨(info·warn·error)을
+ * 카테고리(cron·recurring_tx·asset·notification·file)와 레벨(info·warn·error)을
  * 고르게 섞어 최근 30일 범위로 구성. 메시지는 앱이 실제로 남기는 문구에 맞춘다.
  */
 import { Prisma } from '@prisma/client';
@@ -28,77 +28,21 @@ const LOGS = (userId: number): LogSeed[] => [
   // ── cron ─────────────────────────────────────────────────────────────────
   {
     level: 'info', category: 'cron',
-    message: '반복거래/반복매수(국내) 일괄 처리 완료 (사용자 1명)',
+    message: '반복거래 일괄 처리 완료 (사용자 1명)',
     metadata: { total: 1, failed: 0 },
     created_at: daysAgo(0, 9, 0),
   },
   {
     level: 'info', category: 'cron',
-    message: '반복매수(해외) 일괄 처리 완료 (사용자 1명)',
-    metadata: { total: 1, failed: 0 },
-    created_at: daysAgo(0, 23, 0),
-  },
-  {
-    level: 'info', category: 'cron',
-    message: '반복거래/반복매수(국내) 일괄 처리 완료 (사용자 1명)',
+    message: '반복거래 일괄 처리 완료 (사용자 1명)',
     metadata: { total: 1, failed: 0 },
     created_at: daysAgo(1, 9, 0),
   },
   {
-    user_id: userId, level: 'error', category: 'cron',
-    message: '반복매수(해외) 처리 실패',
-    metadata: { error: 'Connection timeout after 5000ms' },
-    created_at: daysAgo(2, 23, 3),
-  },
-  {
     level: 'info', category: 'cron',
-    message: '반복거래/반복매수(국내) 일괄 처리 완료 (사용자 1명)',
+    message: '반복거래 일괄 처리 완료 (사용자 1명)',
     metadata: { total: 1, failed: 0 },
     created_at: daysAgo(3, 9, 0),
-  },
-
-  // ── recurring_buy ─────────────────────────────────────────────────────────
-  {
-    user_id: userId, level: 'info', category: 'recurring_buy',
-    message: `AAPL 반복매수 ${ym('2026-06')} 회차 처리 완료`,
-    metadata: { investmentId: 3, symbol: 'AAPL', type: 'us_stock', period: ym('2026-06'), quantity: '0.052381', amountKrw: '95200' },
-    created_at: daysAgo(3, 23, 1),
-  },
-  {
-    user_id: userId, level: 'info', category: 'recurring_buy',
-    message: `TIGER 미국S&P500 반복매수 ${ym('2026-06')} 회차 처리 완료`,
-    metadata: { investmentId: 2, symbol: '360750', type: 'etf', period: ym('2026-06'), quantity: '2.000000', amountKrw: '29800' },
-    created_at: daysAgo(3, 9, 1),
-  },
-  {
-    user_id: userId, level: 'warn', category: 'recurring_buy',
-    message: 'TSLA 시세 조회 실패 — 다음 배치에 재시도',
-    metadata: { investmentId: 4, symbol: 'TSLA', type: 'us_stock', period: ym('2026-06'), error: 'Rate limit exceeded (429)' },
-    created_at: daysAgo(5, 23, 2),
-  },
-  {
-    user_id: userId, level: 'info', category: 'recurring_buy',
-    message: `TSLA 반복매수 ${ym('2026-06')} 회차 처리 완료`,
-    metadata: { investmentId: 4, symbol: 'TSLA', type: 'us_stock', period: ym('2026-06'), quantity: '0.038012', amountKrw: '132400' },
-    created_at: daysAgo(4, 23, 1),
-  },
-  {
-    user_id: userId, level: 'warn', category: 'recurring_buy',
-    message: 'AAPL 반복매수 예수금 부족 — 충전 후 재시도',
-    metadata: { investmentId: 3, symbol: 'AAPL', type: 'us_stock', period: ym('2026-05'), required: '182.3400', currency: 'USD' },
-    created_at: daysAgo(10, 23, 1),
-  },
-  {
-    user_id: userId, level: 'error', category: 'recurring_buy',
-    message: 'TIGER 미국S&P500 반복매수 DB 처리 충돌 — 다음 배치에 재시도',
-    metadata: { investmentId: 2, symbol: '360750', type: 'etf', period: ym('2026-05'), error: 'Deadlock found when trying to get lock' },
-    created_at: daysAgo(15, 9, 2),
-  },
-  {
-    user_id: userId, level: 'info', category: 'recurring_buy',
-    message: `TIGER 미국S&P500 반복매수 ${ym('2026-05')} 회차 처리 완료`,
-    metadata: { investmentId: 2, symbol: '360750', type: 'etf', period: ym('2026-05'), quantity: '2.000000', amountKrw: '29200' },
-    created_at: daysAgo(14, 9, 1),
   },
 
   // ── recurring_tx ──────────────────────────────────────────────────────────

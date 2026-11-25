@@ -67,10 +67,9 @@ src/
 ├── auth/          # Google OAuth + JWT 인증 (+ 새 기기 로그인 감지)
 ├── transaction/   # 수입/지출 내역 (반복 자동생성)
 ├── saving/        # 예적금
-├── investment-account/ # 투자 계좌 (예수금 — 종목 여러 개가 공유)
-├── investment/    # 투자 (반복매수 + 현재가 자동 갱신)
 ├── subscription/  # 구독 서비스
-├── asset/         # 순자산 요약/추이 (현금+예적금+투자 집계, 전용 테이블 없음)
+├── exchange-rate/ # 환율 조회 (외화 구독 원화 환산, 10분 캐시)
+├── asset/         # 순자산 요약/추이 (현금+예적금+투자 집계) + 주식모아 투자 합계 받기(investment_summary, ADR 0011)
 ├── notification/  # 알림
 ├── calendar/      # 캘린더
 ├── security/      # 로그인 세션 + 마스터 잠금(Vault) + 열람 기록 조회
@@ -83,13 +82,13 @@ src/
 ├── file/          # 파일 보관함 (Backblaze B2)
 ├── export/        # 데이터 내보내기 (JSON/ZIP)
 ├── import/        # 데이터 가져오기 (계정 JSON 복원)
-├── maintenance/   # 예약 작업 8개 (@Job — 알림·반복거래/반복매수 국내·해외(현재가 갱신 포함)·구독 결제일·순자산 스냅샷·휴지통·DB 백업·공휴일)
-├── recurring-schedule/ # 자동이체 설정 (반복거래·반복매수 규칙 — 크론이 이 규칙대로 회차를 만든다)
+├── maintenance/   # 예약 작업 8개 (@Job — 알림·반복거래·구독 결제일·주식모아 투자 합계 받기·순자산 스냅샷·휴지통·DB 백업·공휴일)
+├── recurring-schedule/ # 자동이체 설정 (반복거래 규칙 — 크론이 이 규칙대로 회차를 만든다)
 ├── transaction-favorite/ # 거래 즐겨찾기 (자주 쓰는 내역을 오늘 날짜로 불러오기)
 ├── holiday/       # 공휴일 (공공데이터포털 특일 정보, 연도별 캐시)
 ├── mail/          # SMTP 메일 발송 (이메일 코드 로그인 등)
 ├── push/          # 웹 푸시 구독/발송 (VAPID)
-├── system-log/    # 시스템 로그 (크론·투자 갱신 등 백그라운드 작업 실행 기록)
+├── system-log/    # 시스템 로그 (크론 등 백그라운드 작업 실행 기록)
 ├── health/        # 헬스체크
 ├── meta/          # GET /_meta 에 붙는 구역 (예약 작업·아웃박스·알림 채널)
 ├── config/        # 환경변수 검증(env.ts)·배포 전 점검(check-env)·외부 연결 설정

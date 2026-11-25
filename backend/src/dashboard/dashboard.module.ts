@@ -1,12 +1,12 @@
 import { Module } from '@nestjs/common';
 import { AssetModule } from '../asset/asset.module';
-import { PriceLookupService } from '../investment/price-lookup.service';
+import { ExchangeRateModule } from '../exchange-rate/exchange-rate.module';
 import { DashboardController } from './dashboard.controller';
 import { DashboardService } from './dashboard.service';
 
 @Module({
-  imports: [AssetModule],
+  imports: [AssetModule, ExchangeRateModule],
   controllers: [DashboardController],
-  providers: [DashboardService, PriceLookupService],
+  providers: [DashboardService],
 })
 export class DashboardModule {}

@@ -47,12 +47,10 @@
 | 파일 | 무엇을 검증하나 | 분류 | 근거 |
 | --- | --- | --- | --- |
 | `asset/asset.service.spec.ts` | 순자산 — 자산이동을 현금에서 빼 이중 계산하지 않음, 전월 대비, 추이 마지막 막대 = 지금 값 | 행동 검증 (빈 곳 큼) | `byType` 현금 · `netWorth` 값 비교. 단 가짜 `groupBy` 가 **`where`(date 조건)를 무시**하고 스냅샷은 모두 `cash_total: null` 이라, 실제 운영 경로인 「직전 월말 `cash_total` + 이후 거래 델타」는 한 번도 타지 않는다 |
-| `transaction/transaction.service.spec.ts` | 자산이동 거래의 대상 잔액 반영 · 수정 시 차액 재반영 · 대상 변경 · 삭제 역반영 · 일괄 삭제 | 행동 검증 | 예적금 `balance` · 계좌 `cash_balance` 숫자 비교. 가짜 `updateMany` 가 `increment/decrement` 를 흉내 |
+| `transaction/transaction.service.spec.ts` | 자산이동 거래의 대상 잔액 반영 · 수정 시 차액 재반영 · 대상 변경 · 삭제 역반영 · 일괄 삭제 | 행동 검증 | 예적금 `balance` 숫자 비교. 가짜 `updateMany` 가 `increment/decrement` 를 흉내 |
 | `transaction/recurring.util.spec.ts` | 반복 규칙 — 회차 키, 주말 보정, 말일 클램프, n번째 회차(월 · 연 · 주 · 평일), 월 범위 | 행동 검증 (순수 함수) | 날짜 문자열 비교 |
 | `transaction-favorite/transaction-favorite.service.spec.ts` | 즐겨찾기 중복 거부 · 개수 상한 · 순서 변경(남의 id 거부) · 수정 충돌 · 남의 것 삭제 거부 | 행동 검증 | 목록 순서 · 예외 종류 |
-| `investment/investment.service.spec.ts` | 매수 · 매도의 예수금 연동, 평균단가 원금 차감, 반복매수 회차 적립(멱등 · 잔액 부족 시 중단 · 주 · 일 주기), 배치 대기 | 행동 검증 | 원금 · 수량 · 예수금 숫자. 시세 조회는 mock(외부 API) |
-| `investment-account/investment-account.service.spec.ts` | 계좌번호 암호화 · 마스킹, 보유 종목 집계, 보유 중 삭제 차단, 환전 | 행동 검증 | 실제 암호화 왕복 + 숫자 비교 |
-| `recurring-schedule/recurring-schedule.service.spec.ts` | 자동이체 설정 필수값 · 남의 종목 거부 · 토글 · 삭제 | 행동 검증 | 예외 · `active` 값 · 목록 길이 |
+| `recurring-schedule/recurring-schedule.service.spec.ts` | 자동이체 설정 필수값 · 토글 · 삭제 | 행동 검증 | 예외 · `active` 값 · 목록 길이 |
 | `subscription/billing-date.util.spec.ts` | 결제일 계산 — 말일 클램프 후 원래 결제일 복귀, 윤일, 여러 주기 넘기기, KST 오늘 | 행동 검증 (순수 함수) | 날짜 비교 |
 | `subscription/subscription.service.spec.ts` | 구독 요약의 USD 환율 환산 | 행동 검증 | 월 · 연 합계 숫자, KRW 만 있으면 환율 API 미호출 |
 
@@ -113,16 +111,16 @@
 
 | 흐름 | 코드 | 현재 | 왜 중요한가 |
 | --- | --- | --- | --- |
-| 전역 JWT 가드 + `@Public` 예외 — 로그인 없이 열린 엔드포인트가 없는지 | `app.module.ts:105`, 각 컨트롤러 | 컨트롤러 테스트 0개 · e2e 미실행 | 데코레이터 하나 잘못 붙이면 보관함 API 가 열린다 |
+| 전역 JWT 가드 + `@Public` 예외 — 로그인 없이 열린 엔드포인트가 없는지 | `app.module.ts:101`, 각 컨트롤러 | 컨트롤러 테스트 0개 · e2e 미실행 | 데코레이터 하나 잘못 붙이면 보관함 API 가 열린다 |
 | refresh 쿠키 속성(`httpOnly` · `SameSite=Lax`) | `auth/auth.controller.ts:43`~`:58` | 없음 | 2026-10-09 CSRF 수정 지점 — 되돌아가도 테스트가 못 잡는다 |
 | 구글 로그인의 `ALLOWED_EMAILS` 거부 | `auth/auth.module.ts:23` → core-auth | 이 레포엔 없음 (이메일 코드 쪽만 있음) | 화이트리스트가 유일한 접근 제한이다. core-auth(young-core) 쪽 테스트가 있는지 확인 필요 |
 | Rate limit(`@Throttle`) — 비번 열람 · TOTP · 보관함 잠금해제 | `credential/credential.controller.ts` 등 6곳 | 없음 | 무차별 대입 방어 |
 | 암호문 컬럼 쓰기 가드 — 평문이 `_enc` 컬럼에 저장되지 않는지 | `prisma/prisma.service.ts` (core-security `encryptedFields`) | 없음 (`crypto-fields.spec` 은 목록 대조만) | 가드가 빠지면 평문 비번이 DB 에 그대로 남는다 |
 | 데이터 내보내기 — 계정 JSON 의 이메일 문맥 암호화 · 전체 ZIP | `export/export.service.ts` | 없음 (복원 쪽 `import` 만 있음) | 내보내기 → 가져오기 왕복이 깨지면 백업이 쓸모없어진다 |
 | 순자산 월말 스냅샷 + 현금 델타 | `maintenance/net-worth-snapshot-cron.service.ts`, `asset/asset.service.ts:63` | 크론 테스트 없음 · 델타 경로 미검증 (가짜 후보 ③) | 대시보드 첫 숫자. 이중 계산 버그가 실제로 있었던 곳 |
-| 가계부 목록 · 월 요약 · 월별 추이 합계 | `transaction/transaction.service.ts:314`~`:426` | 없음 (자산이동 잔액만 있음) | 화면의 수입 · 지출 · 잔액 숫자 |
-| 반복거래 회차 생성 (멱등 · 시작일 이전 회차 제외 · 자산이동 일괄 반영) | `transaction/transaction.service.ts:186`~`:281` | 없음 (순수 함수 `recurring.util` 만) | 매일 크론이 돈다 — 두 번 생성되면 돈이 두 번 빠진다. 반복매수 쪽(`investment`)은 테스트가 있다 |
-| 가계부 엑셀 가져오기 · 내보내기 | `transaction/transaction.service.ts:465`, `:575` | 없음 (계정 엑셀만 있음) | 대량 입력 경로 |
+| 가계부 목록 · 월 요약 · 월별 추이 합계 | `transaction/transaction.service.ts:309`~`:421` | 없음 (자산이동 잔액만 있음) | 화면의 수입 · 지출 · 잔액 숫자 |
+| 반복거래 회차 생성 (멱등 · 시작일 이전 회차 제외 · 자산이동 일괄 반영) | `transaction/transaction.service.ts:181`~`:276` | 없음 (순수 함수 `recurring.util` 만) | 매일 크론이 돈다 — 두 번 생성되면 돈이 두 번 빠진다. |
+| 가계부 엑셀 가져오기 · 내보내기 | `transaction/transaction.service.ts:460`, `:570` | 없음 (계정 엑셀만 있음) | 대량 입력 경로 |
 | 알림 크론 — 만기 · 결제 D-day 정확히 그날만, 같은 제목 미읽음이면 건너뜀 | `maintenance/notification-cron.service.ts` | 없음 | 매일 반복 알림 · 누락 |
 | 알림 + 푸시 한 트랜잭션 (`createWithPush`) | `notification/notification.service.ts` | 없음 (아웃박스 저장소만) | 롤백 시 푸시가 나가지 않아야 한다 |
 | 세션 강제 로그아웃 — refresh 폐기 + 그 기기 푸시 삭제 | `security/security.service.ts:36`~`:89` | 없음 (로그아웃 쪽은 있음) | 2026-10-15 수정("로그아웃한 기기로 알림이 가지 않게") 지점 |

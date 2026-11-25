@@ -66,7 +66,7 @@ reencrypt(payload: string, context: string): string {
 Prisma 클라이언트 확장. 쓰기 연산(`create` · `update` · `upsert` 등)에서 암호문 컬럼 값이 위 형식이 아니면 막는다. 오류 메시지에 값은 넣지 않는다(값이 곧 비밀이다).
 
 ```ts
-prisma.$extends(encryptedFields({ credential: ['password_enc', 'totp_enc', 'backup_codes_enc'], investmentAccount: ['account_number_enc'] }));
+prisma.$extends(encryptedFields({ credential: ['password_enc', 'totp_enc', 'backup_codes_enc'] }));
 ```
 
 - 읽을 때 자동 복호화는 일부러 하지 않는다. 자동이면 목록 조회에도 평문이 실린다 — 열람은 마스터 잠금 · 감사 로그 · 레이트 리밋을 거치는 명시적 동작으로 남긴다.

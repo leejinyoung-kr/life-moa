@@ -57,7 +57,7 @@ function daysBetween(from: string, to: string): number {
   return Math.round((Date.UTC(ty, tm - 1, td) - Date.UTC(fy, fm - 1, fd)) / 86400000);
 }
 
-// 연동 일정(구독·예적금·투자 계좌 만기) 여부 — 공휴일은 연동 표시를 하지 않는다
+// 연동 일정(구독·예적금 만기) 여부 — 공휴일은 연동 표시를 하지 않는다
 const isLinked = (ev: CalEvent) => ev.virtual && ev.type !== 'holiday';
 
 // 연동 일정의 원래 화면 경로 (없으면 null)
@@ -298,7 +298,7 @@ export default function CalendarPage() {
               </div>
               <p className="flex gap-2 items-start mt-3.5 pt-3 border-t border-border-subtle text-[0.75rem] text-muted break-keep">
                 <IconLink width={13} height={13} className="shrink-0 mt-0.75" />
-                <span>연결 표시는 구독 · 예적금 · 투자 화면에서 온 일정입니다. 수정은 원래 화면에서 하고, 여기서 지우면 원본도 지워집니다.</span>
+                <span>연결 표시는 구독 · 예적금 화면에서 온 일정입니다. 수정은 원래 화면에서 하고, 여기서 지우면 원본도 지워집니다.</span>
               </p>
             </CardBody>
             <div className="flex items-center justify-between px-4.5 py-3 border-t border-border-subtle">

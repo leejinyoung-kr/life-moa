@@ -1,13 +1,13 @@
 import { SubscriptionService } from './subscription.service';
-import { PriceLookupService } from '../investment/price-lookup.service';
+import { ExchangeRateService } from '../exchange-rate/exchange-rate.service';
 import { Prisma } from '@prisma/client';
 
-// summary() 의 환율 환산 로직 검증. Prisma 는 인메모리 가짜, PriceLookupService 는 모킹.
+// summary() 의 환율 환산 로직 검증. Prisma 는 인메모리 가짜, ExchangeRateService 는 모킹.
 describe('SubscriptionService.summary', () => {
   let rows: any[];
   let prisma: any;
-  let priceLookup: PriceLookupService;
-  const svc = () => new SubscriptionService(prisma, priceLookup);
+  let exchangeRate: ExchangeRateService;
+  const svc = () => new SubscriptionService(prisma, exchangeRate);
 
   beforeEach(() => {
     rows = [];
@@ -20,9 +20,9 @@ describe('SubscriptionService.summary', () => {
         ),
       },
     };
-    priceLookup = {
+    exchangeRate = {
       getExchangeRate: jest.fn(async () => 1400),
-    } as unknown as PriceLookupService;
+    } as unknown as ExchangeRateService;
   });
 
   function row(overrides: Partial<any>) {
@@ -49,14 +49,14 @@ describe('SubscriptionService.summary', () => {
     row({ amount: 10000, currency: 'KRW' });
     const res = await svc().summary(1);
     expect(res.monthlyTotal).toBe(10000);
-    expect(priceLookup.getExchangeRate).not.toHaveBeenCalled();
+    expect(exchangeRate.getExchangeRate).not.toHaveBeenCalled();
   });
 
   it('USD 구독은 환율을 반영해 원화 합계에 더해진다', async () => {
     row({ amount: 10000, currency: 'KRW' });
     row({ amount: 10, currency: 'USD' }); // 10 * 1400 = 14000
     const res = await svc().summary(1);
-    expect(priceLookup.getExchangeRate).toHaveBeenCalledWith('USD', 'KRW');
+    expect(exchangeRate.getExchangeRate).toHaveBeenCalledWith('USD', 'KRW');
     expect(res.monthlyTotal).toBe(24000);
     expect(res.yearlyTotal).toBe(24000 * 12);
   });
@@ -66,10 +66,10 @@ describe('SubscriptionService.summary', () => {
 describe('SubscriptionService.update (일시정지 해제)', () => {
   let current: any;
   let prisma: any;
-  const priceLookup = {
+  const exchangeRate = {
     getExchangeRate: jest.fn(),
-  } as unknown as PriceLookupService;
-  const svc = () => new SubscriptionService(prisma, priceLookup);
+  } as unknown as ExchangeRateService;
+  const svc = () => new SubscriptionService(prisma, exchangeRate);
   const d = (s: string) => new Date(`${s}T00:00:00Z`);
 
   beforeEach(() => {

@@ -39,11 +39,10 @@ export const SOURCE_ICON: Record<string, IconComponent> = {
 };
 export const FALLBACK_SOURCE_ICON: IconComponent = IconBell;
 
-// 출처(source) → 이동할 화면. 알림에 링크 필드가 없어 프론트에서 고정 매핑 — 없는 출처는 이동 버튼을 숨긴다. 예적금 · 투자는 가계부의 그 탭으로 연다
+// 출처(source) → 이동할 화면. 알림에 링크 필드가 없어 프론트에서 고정 매핑 — 없는 출처는 이동 버튼을 숨긴다. 예적금은 가계부의 그 탭으로 연다. 옛 「투자」 알림은 갈 화면이 없어 버튼이 없다 (ADR 0011)
 export const SOURCE_LINK: Record<string, { href: string; label: string }> = {
   '구독': { href: '/subscriptions', label: '구독 관리' },
   '예적금': { href: '/transactions?tab=savings', label: '예적금' },
-  '투자': { href: '/transactions?tab=invest', label: '투자' },
   '보안': { href: '/security', label: '보안' },
   '계정 보관함': { href: '/credentials', label: '계정 보관함' },
   '파일 보관함': { href: '/files', label: '파일 보관함' },

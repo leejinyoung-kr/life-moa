@@ -69,7 +69,6 @@ export class ExportService {
     const [
       transactions,
       savings,
-      investments,
       subscriptions,
       calendarEvents,
       notifications,
@@ -79,7 +78,6 @@ export class ExportService {
     ] = await this.prisma.$transaction([
       this.prisma.transaction.findMany(where),
       this.prisma.saving.findMany(where),
-      this.prisma.investment.findMany(where),
       this.prisma.subscription.findMany(where),
       this.prisma.calendarEvent.findMany(where),
       this.prisma.notification.findMany({ where: { user_id: userId } }),
@@ -99,7 +97,6 @@ export class ExportService {
     const data: Record<string, unknown> = {
       transactions,
       savings,
-      investments,
       subscriptions,
       calendarEvents,
       notifications,

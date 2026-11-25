@@ -21,7 +21,6 @@ export class TrashCronService {
     const simple: [string, () => Promise<{ count: number }>][] = [
       ['transaction', () => this.prisma.transaction.deleteMany({ where })],
       ['saving', () => this.prisma.saving.deleteMany({ where })],
-      ['investment', () => this.prisma.investment.deleteMany({ where })],
       ['subscription', () => this.prisma.subscription.deleteMany({ where })],
       ['calendar_event', () => this.prisma.calendarEvent.deleteMany({ where })],
       ['credential', () => this.prisma.credential.deleteMany({ where })],

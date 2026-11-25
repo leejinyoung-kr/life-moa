@@ -16,7 +16,6 @@ import 'dotenv/config';
 import type { SeedFn } from './seeds/helpers';
 import { seedTransactions } from './seeds/transactions.seed';
 import { seedSavings } from './seeds/savings.seed';
-import { seedInvestments } from './seeds/investments.seed';
 import { seedInvestmentSummary } from './seeds/investment-summary.seed';
 import { seedSubscriptions } from './seeds/subscriptions.seed';
 import { seedNetWorthSnapshots } from './seeds/net-worth-snapshot.seed';
@@ -34,11 +33,10 @@ const adapter = withKstDateTime(new PrismaMariaDb(process.env.DATABASE_URL!));
 const prisma = new PrismaClient({ adapter });
 
 // 등록된 도메인 시드 (실행 순서 = 배열 순서). 도메인 늘면 여기에 추가.
-// 예적금/투자는 수입/지출보다 먼저 — 자산이동(transfer) 거래가 대상(target) 행을 이름으로 조회해 연동하므로 순서 필요
+// 예적금은 수입/지출보다 먼저 — 자산이동(transfer) 거래가 대상(target) 행을 이름으로 조회해 연동하므로 순서 필요
 // 순자산 스냅샷은 수입/지출 뒤 — 월말 현금을 시드된 거래로 계산한다
 const SEEDS: { name: string; run: SeedFn }[] = [
   { name: '예적금', run: seedSavings },
-  { name: '투자', run: seedInvestments },
   { name: '투자 합계', run: seedInvestmentSummary },
   { name: '수입/지출', run: seedTransactions },
   { name: '순자산 스냅샷', run: seedNetWorthSnapshots },
@@ -70,7 +68,7 @@ async function main() {
   console.log(`시드 대상 사용자 ${users.length}명 · 도메인 ${SEEDS.length}종`);
 
   for (const u of users) {
-    // 순차 실행 — 수입/지출 시드가 예적금/투자/자산종합 행을 이름으로 조회해 연동하므로 배열 순서가 곧 의존 순서
+    // 순차 실행 — 수입/지출 시드가 예적금 행을 이름으로 조회해 연동하므로 배열 순서가 곧 의존 순서
     const counts: number[] = [];
     for (const s of SEEDS) {
       counts.push(await s.run(prisma, u.id));

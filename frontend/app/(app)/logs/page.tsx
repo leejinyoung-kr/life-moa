@@ -182,7 +182,7 @@ export default function LogsPage() {
 
   return (
     <AppShell activePath="/logs">
-      <PageHeader title="시스템 로그" description="크론 실행, 반복매수, 오류 이력을 확인합니다." />
+      <PageHeader title="시스템 로그" description="크론 실행, 오류 이력을 확인합니다." />
 
       {/* 레벨 알약 — 클릭 즉시 반영 (수준별 개수는 서버가 주지 않아 붙이지 않는다) */}
       <Segmented

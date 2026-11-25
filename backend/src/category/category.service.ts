@@ -169,14 +169,6 @@ const SEED: Record<
     { code: 'investment', label: '투자' },
     { code: 'etc', label: '기타' },
   ],
-  investment: [
-    { code: 'domestic_stock', label: '국내주식' },
-    { code: 'foreign_stock', label: '해외주식' },
-    { code: 'domestic_etf', label: '국내ETF' },
-    { code: 'foreign_etf', label: '해외ETF' },
-    { code: 'crypto', label: '가상자산' },
-    { code: 'etc', label: '기타' },
-  ],
   saving: [
     { code: 'savings', label: '적금' },
     { code: 'deposit', label: '예금' },

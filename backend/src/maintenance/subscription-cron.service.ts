@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma, Subscription } from '@prisma/client';
 import { Job } from '@leejinyoung-kr/core-jobs';
 import { PrismaService } from '../prisma/prisma.service';
-import { PriceLookupService } from '../investment/price-lookup.service';
+import { ExchangeRateService } from '../exchange-rate/exchange-rate.service';
 import { pastBillingDates } from '../subscription/billing-date.util';
 import { kstDateStr, todayKst } from '../common/kst-date';
 
@@ -29,7 +29,7 @@ type DueRow = Pick<
 export class SubscriptionCronService {
   constructor(
     private prisma: PrismaService,
-    private priceLookup: PriceLookupService,
+    private exchangeRate: ExchangeRateService,
   ) {}
 
   // 매일 0시 5분 — 결제일이 지난 구독을 주기만큼 넘긴다(월/연은 원래 결제일 billing_day 기준). 체험은 종료일이 지나면 유료 전환으로 보고 활성으로 바꾼다.
@@ -67,7 +67,7 @@ export class SubscriptionCronService {
     // 환율은 넣을 USD 구독이 있을 때만 한 번 조회. 실패하면 그 구독은 결제일도 넘기지 않고 다음 날 다시 한다(내역을 빠뜨리지 않게)
     const needsRate = rows.some((r) => r.auto_ledger && r.currency === 'USD');
     const usdRate = needsRate
-      ? await this.priceLookup.getExchangeRate('USD', 'KRW').catch(() => null)
+      ? await this.exchangeRate.getExchangeRate('USD', 'KRW').catch(() => null)
       : null;
 
     let rolled = 0;
