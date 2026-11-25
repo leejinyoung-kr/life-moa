@@ -9,6 +9,7 @@
   - ISA 만기 일정: AI 추천안(일반 일정으로 한 번 옮기기)을 사용자가 채택했다 (2026-11-23, 같은 기획서 4절)
   - 데모의 투자 값: AI 가 둘을 비교했다 — A 샘플 데이터로 넣기 · B 데모일 때 코드에서 고정값. 사용자가 AI 추천안 A 를 골랐다 (2026-11-25)
   - 두 앱 연결 경로: AI 가 셋을 비교했다 — infra 네트워크 + 별칭 · 두 backend 만 붙는 전용 네트워크 · 컨테이너 이름. 사용자가 AI 추천안(infra + 별칭)을 골랐다 (2026-11-25)
+  - 운영 반영 순서: AI 가 둘을 비교했다 — A 데이터 정리와 테이블 지우기를 두 번의 배포로 나누기 · B 한 번에 하고 실패하면 덤프 복원. 사용자가 AI 추천안 A 를 골랐다 (2026-11-25)
   - 그 밖의 값(받는 시각 00:50 · 부팅 때 20시간 기준 · 표시 문구 · 옮긴 만기 일정의 당일 알림 켜기 · 반복 작업 이름 유지 · 환율 조회 떼어 내기)은 구현하며 AI 가 정했다
 
 ## 맥락
@@ -27,7 +28,8 @@
    - 주식모아에 없는 사용자(「사용자 없음」)는 건너뛴다.
 3. **두 앱은 홈서버 컨테이너끼리만 잇는다.** 두 backend 가 이미 붙어 있는 infra 네트워크에서 주식모아 backend 별칭 `stockmoa-backend` 로 부른다. infra 에는 여러 앱의 `backend` 가 같이 있어 서비스 이름으로는 갈 곳이 정해지지 않는다. 로그인 대신 내부 토큰(`STOCKMOA_INTERNAL_TOKEN` = 주식모아 `INTERNAL_API_TOKEN`)을 쓰고, 사용자는 `X-User-Email` 헤더로 알린다. 주식모아 nginx 가 밖에서 오는 `/api/v1/internal/` 을 막는다.
 4. **데모는 주식모아를 부르지 않는다.** 데모 `.env` 에 주소 · 토큰을 넣지 않아 받기가 돌지 않고, 시드가 `investment_summary` 샘플 한 행을 넣는다(`prisma/seeds/investment-summary.seed.ts`). 화면 · 계산은 운영과 같은 코드를 탄다.
-5. **지난 기록은 그대로 둔다.** 월별 순자산 스냅샷의 과거 값, 투자 예수금으로 보낸 자산이동 거래(현금에서 빠져나간 기록 — 지우면 현금이 틀어진다)는 남긴다. 대상 종류(`investment`)는 두고 연결 id 만 비운다 — 화면에는 연결 없는 자산이동으로 보이고, 새로 고를 수 있는 대상은 예적금뿐이다. 반복 자동이체 설정도 같다. ISA 만기는 빼기 전에 이 앱 일반 일정으로 한 번 옮긴다(만기일은 바뀌지 않는다, 당일 오전 9시 알림 켬 — 옛 D-30 · 14 · 7 · 1 만기 알림 대신). 순서는 마이그레이션 `20261125120000_remove_investments` 한 파일 — 옮기기 → 연결 끊기 → 반복매수 설정 · 투자 유형 지우기 → 테이블 지우기.
+5. **지난 기록은 그대로 둔다.** 월별 순자산 스냅샷의 과거 값, 투자 예수금으로 보낸 자산이동 거래(현금에서 빠져나간 기록 — 지우면 현금이 틀어진다)는 남긴다. 대상 종류(`investment`)는 두고 연결 id 만 비운다 — 화면에는 연결 없는 자산이동으로 보이고, 새로 고를 수 있는 대상은 예적금뿐이다. 반복 자동이체 설정도 같다. ISA 만기는 빼기 전에 이 앱 일반 일정으로 한 번 옮긴다(만기일은 바뀌지 않는다, 당일 오전 9시 알림 켬 — 옛 D-30 · 14 · 7 · 1 만기 알림 대신). 순서는 옮기기 → 연결 끊기 → 반복매수 설정 · 투자 유형 지우기(마이그레이션 `20261125120000_remove_investments`) → 다음 배포에서 테이블 · 컬럼 지우기(`20261125130000_drop_investment_tables`).
+6. **데이터 정리와 테이블 지우기는 두 번에 배포한다.** 배포는 컨테이너를 바꾸기 전에 마이그레이션을 돌린다(ADR 0004). 그 뒤 점검(`crypto-check` · `nginx -t` · healthy 대기)에서 멈추면 옛 컨테이너가 계속 도는데, 옛 코드는 투자 테이블을 읽는다. 첫 배포는 옛 코드도 견디는 데이터 정리만 하고, 새 코드가 뜬 것을 본 뒤 두 번째 배포가 테이블을 지운다.
 
 ## 대안
 
@@ -48,5 +50,5 @@
 - 주식모아에서 그 사용자가 빠져도(「사용자 없음」) 마지막으로 받은 행은 지우지 않는다 — 받은 날짜가 화면에 보인다.
 - 투자 상세(종목 · 손익)는 이 앱에서 볼 수 없다 — 주식모아에서 본다.
 - 옛 「투자」 알림 · 시스템 로그(`recurring_buy`)는 남는다 — 알림의 이동 버튼은 없어지고, 로그는 90일 뒤 휴지통 작업이 지운다.
-- 운영 반영(되돌리기 어렵다): 운영 DB 덤프 → 홈서버 두 `.env` 에 같은 내부 토큰(주식모아 `INTERNAL_API_TOKEN`, 생활모아 `STOCKMOA_INTERNAL_URL=http://stockmoa-backend:8040` · `STOCKMOA_INTERNAL_TOKEN`) → 주식모아 먼저 배포(별칭 · 내부 API) → 생활모아 배포(마이그레이션이 테이블을 지운다). 데모 `.env` 에는 넣지 않는다.
-- 코드: `backend/src/asset/investment-summary.service.ts`(받기 · 저장), `backend/src/maintenance/investment-summary-cron.service.ts`(매일 · 부팅), `backend/src/asset/asset.service.ts`(순자산 요약), `frontend/app/(app)/networth/page.tsx`(「투자」 줄), `backend/prisma/migrations/20261125120000_remove_investments/`(빼기), `backend/src/exchange-rate/`(환율)
+- 운영 반영(되돌리기 어렵다): 운영 DB 덤프 → 홈서버 두 `.env` 에 같은 내부 토큰(주식모아 `INTERNAL_API_TOKEN`, 생활모아 `STOCKMOA_INTERNAL_URL=http://stockmoa-backend:8040` · `STOCKMOA_INTERNAL_TOKEN`) → 주식모아 먼저 배포(별칭 · 내부 API) → 생활모아 1차 배포(새 코드 + 데이터 정리) → 새 코드가 뜬 것을 본 뒤 2차 배포(테이블 지우기). 데모 `.env` 에는 넣지 않는다. 토큰이 비어 있어도 배포는 된다 — 생활모아는 받기를 건너뛰고, 주식모아 내부 API 는 404 다.
+- 코드: `backend/src/asset/investment-summary.service.ts`(받기 · 저장), `backend/src/maintenance/investment-summary-cron.service.ts`(매일 · 부팅), `backend/src/asset/asset.service.ts`(순자산 요약), `frontend/app/(app)/networth/page.tsx`(「투자」 줄), `backend/prisma/migrations/20261125120000_remove_investments/`(데이터 정리) · `20261125130000_drop_investment_tables/`(테이블 지우기 — 2차 배포), `backend/src/exchange-rate/`(환율)
