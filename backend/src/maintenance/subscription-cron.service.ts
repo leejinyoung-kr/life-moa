@@ -4,7 +4,7 @@ import { Job } from '@leejinyoung-kr/core-jobs';
 import { PrismaService } from '../prisma/prisma.service';
 import { ExchangeRateService } from '../exchange-rate/exchange-rate.service';
 import { pastBillingDates } from '../subscription/billing-date.util';
-import { kstDateStr, todayKst } from '../common/kst-date';
+import { kstDate, kstToday } from '@leejinyoung-kr/core-time';
 
 // 구독 자동 등록 내역의 가계부 카테고리 — 가계부 소분류 「구독·정기결제」
 const LEDGER_CATEGORY = 'insurance_subscription';
@@ -41,7 +41,7 @@ export class SubscriptionCronService {
     leaseMs: 5 * 60_000,
   })
   async rollForwardPastDue(): Promise<string> {
-    const today = todayKst();
+    const today = kstToday();
     const rows = await this.prisma.subscription.findMany({
       where: {
         deleted_at: null,
@@ -85,7 +85,7 @@ export class SubscriptionCronService {
         today,
       );
       // 구독을 등록하기 전 결제일은 이미 손으로 넣었을 수 있어 만들지 않는다
-      const since = kstDateStr(r.created_at);
+      const since = kstDate(r.created_at);
       const dates = r.auto_ledger
         ? past.filter((d) => d.toISOString().slice(0, 10) >= since)
         : [];

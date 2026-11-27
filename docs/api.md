@@ -27,7 +27,7 @@ Base URL: `http://localhost:8000/api/v1`
 
 | Method | Endpoint | 설명 |
 | --- | --- | --- |
-| GET | /health | 헬스체크 (`@Public`) — DB 핑(`SELECT 1`). 정상 200 `{ status: 'ok', db: 'up', uptime, timestamp }`, DB 가 끊기면 503 `{ status: 'error', db: 'down', … }`. 컨테이너 healthcheck 가 쓴다 |
+| GET | /health | 헬스체크 (`@Public`, core-common `HealthModule`) — DB 핑(`SELECT 1`). 정상 200 `{ status: 'ok', db: 'up', uptime }`, DB 가 끊기거나 3초 안에 답이 없으면 503 `{ status: 'error', db: 'down', uptime }`. 컨테이너 healthcheck 가 쓴다 |
 | GET | /_meta | 운영 상태 (로그인 필요, 코어 core-common `MetaModule`) — 빌드 커밋 · 설치된 `@leejinyoung-kr/core-*` 버전 + 구역 `jobs`(예약 작업별 마지막 성공 · 다음 실행) · `outbox`(알림 발송 적체) · `notification`(켜진 알림 채널). 경고는 `warn` 배열 한자리에 모인다 (`backend/src/meta/`) |
 
 ## 가계부 — 수입/지출

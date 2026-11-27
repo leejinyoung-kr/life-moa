@@ -3,7 +3,7 @@ import { Job } from '@leejinyoung-kr/core-jobs';
 import { PrismaService } from '../prisma/prisma.service';
 import { AssetService } from '../asset/asset.service';
 import { SystemLogService } from '../system-log/system-log.service';
-import { kstMonthStr } from '../common/kst-date';
+import { kstMonth } from '@leejinyoung-kr/core-time';
 import { finishPerUser } from './job-result';
 
 // 매일 새벽 1시 — 어제가 속한 달(YYYY-MM)의 순자산·현금 총액을 스냅샷으로 저장해 추이 차트와
@@ -25,7 +25,7 @@ export class NetWorthSnapshotCronService {
     const users = await this.prisma.user.findMany({ select: { id: true } });
 
     // 새벽 1시 값 ≈ 어제 끝 값 — 1일 새벽 실행이 지난달 월말 값을 확정한다
-    const month = kstMonthStr(new Date(Date.now() - 24 * 60 * 60_000));
+    const month = kstMonth(new Date(Date.now() - 24 * 60 * 60_000));
 
     let ok = 0;
     for (const u of users) {

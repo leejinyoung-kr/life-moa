@@ -11,7 +11,7 @@ import { parsePage } from '@leejinyoung-kr/core-common';
 import { CreateSubscriptionDto } from './dto/create-subscription.dto';
 import { QuerySubscriptionDto } from './dto/query-subscription.dto';
 import { UpdateSubscriptionDto } from './dto/update-subscription.dto';
-import { todayKst } from '../common/kst-date';
+import { kstToday } from '@leejinyoung-kr/core-time';
 import { rollForward } from './billing-date.util';
 
 // Date → 'YYYY-MM-DD' (@db.Date 는 시각 정보 없음)
@@ -122,7 +122,7 @@ export class SubscriptionService {
     );
 
     // 다음 결제 임박 — 오늘(KST) 이후 가장 가까운 결제일
-    const today = todayKst();
+    const today = kstToday();
     const upcoming = billing
       .filter((r) => r.next_payment_date >= today)
       .sort(
@@ -209,7 +209,7 @@ export class SubscriptionService {
         nextDate ?? current.next_payment_date,
         dto.cycle ?? current.cycle,
         billingDay,
-        todayKst(),
+        kstToday(),
       );
     }
     const updated = await this.prisma.subscription.update({

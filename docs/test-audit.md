@@ -111,7 +111,7 @@
 
 | 흐름 | 코드 | 현재 | 왜 중요한가 |
 | --- | --- | --- | --- |
-| 전역 JWT 가드 + `@Public` 예외 — 로그인 없이 열린 엔드포인트가 없는지 | `app.module.ts:101`, 각 컨트롤러 | 컨트롤러 테스트 0개 · e2e 미실행 | 데코레이터 하나 잘못 붙이면 보관함 API 가 열린다 |
+| 전역 JWT 가드 + `@Public` 예외 — 로그인 없이 열린 엔드포인트가 없는지 | `app.module.ts:106`, 각 컨트롤러 | 컨트롤러 테스트 0개 · e2e 미실행 | 데코레이터 하나 잘못 붙이면 보관함 API 가 열린다 |
 | refresh 쿠키 속성(`httpOnly` · `SameSite=Lax`) | `auth/auth.controller.ts:43`~`:58` | 없음 | 2026-10-09 CSRF 수정 지점 — 되돌아가도 테스트가 못 잡는다 |
 | 구글 로그인의 `ALLOWED_EMAILS` 거부 | `auth/auth.module.ts:23` → core-auth | 이 레포엔 없음 (이메일 코드 쪽만 있음) | 화이트리스트가 유일한 접근 제한이다. core-auth(young-core) 쪽 테스트가 있는지 확인 필요 |
 | Rate limit(`@Throttle`) — 비번 열람 · TOTP · 보관함 잠금해제 | `credential/credential.controller.ts` 등 6곳 | 없음 | 무차별 대입 방어 |

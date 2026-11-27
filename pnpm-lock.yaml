@@ -182,8 +182,8 @@ importers:
         specifier: ^0.4.0
         version: 0.4.0(@nestjs/common@11.1.24(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/core@11.1.24)(@nestjs/passport@11.0.5(@nestjs/common@11.1.24(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(passport@0.7.0))
       '@leejinyoung-kr/core-common':
-        specifier: ^0.3.0
-        version: 0.3.0(@nestjs/common@11.1.24(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))
+        specifier: ^0.4.0
+        version: 0.4.0(@nestjs/common@11.1.24(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))
       '@leejinyoung-kr/core-config':
         specifier: ^0.2.0
         version: 0.2.0
@@ -191,8 +191,8 @@ importers:
         specifier: ^0.1.0
         version: 0.1.0(@prisma/adapter-mariadb@7.10.0)
       '@leejinyoung-kr/core-jobs':
-        specifier: ^0.2.0
-        version: 0.2.0(@nestjs/common@11.1.24(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/core@11.1.24)
+        specifier: ^0.3.0
+        version: 0.3.0(@nestjs/common@11.1.24(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/core@11.1.24)
       '@leejinyoung-kr/core-logging':
         specifier: ^0.2.0
         version: 0.2.0(@nestjs/common@11.1.24(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))
@@ -205,6 +205,9 @@ importers:
       '@leejinyoung-kr/core-storage':
         specifier: ^0.3.0
         version: 0.3.0(@nestjs/common@11.1.24(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))
+      '@leejinyoung-kr/core-time':
+        specifier: ^0.1.0
+        version: 0.1.0
       '@nestjs/common':
         specifier: ^11.0.1
         version: 11.1.24(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1)
@@ -1460,8 +1463,8 @@ packages:
       '@nestjs/core': ^11.0.0
       '@nestjs/passport': ^11.0.0
 
-  '@leejinyoung-kr/core-common@0.3.0':
-    resolution: {integrity: sha512-6aBtuj7v6qnQTPUSLD5MzMy4LrrL+yEzR4YKbjGW1ovXwR4ZG9fzI1yprYqVFyimDS2La50C6RIAfz36WAnVvQ==, tarball: https://npm.pkg.github.com/download/@leejinyoung-kr/core-common/0.3.0/5c562f4c1b27197c0928e04acf26aee58d43e249}
+  '@leejinyoung-kr/core-common@0.4.0':
+    resolution: {integrity: sha512-jSRDuGgNhqEatAIebRN900l2GPAiIYIE6rgXJRbgHLtA3YtLdZTBZvONOISCgphAuTxifFkfn8wc3ugvCPrcwQ==, tarball: https://npm.pkg.github.com/download/@leejinyoung-kr/core-common/0.4.0/22b851fd13589dd00f78e7685da47a8f7612736f}
     peerDependencies:
       '@nestjs/common': ^11.0.0
 
@@ -1473,8 +1476,8 @@ packages:
     peerDependencies:
       '@prisma/adapter-mariadb': 7.10.0
 
-  '@leejinyoung-kr/core-jobs@0.2.0':
-    resolution: {integrity: sha512-L0Ot0mmeIHbi58dIY8vr2Jl6wVcdKkHjW9meH/UlYpM4lcaP7bLaFl8gm3+fVkR2SyXrnEYFVyxYC0MGNujbWQ==, tarball: https://npm.pkg.github.com/download/@leejinyoung-kr/core-jobs/0.2.0/168e6e4a61ff673b7673010c8605c68c099a2823}
+  '@leejinyoung-kr/core-jobs@0.3.0':
+    resolution: {integrity: sha512-MkOPUEO0YqlJmx3qq/P0QU4p4nTOO3IL+54kv0RB0vouoHshAlN40uSVwNlmALt/W3VFEFJCe74VviRAGts9sg==, tarball: https://npm.pkg.github.com/download/@leejinyoung-kr/core-jobs/0.3.0/6e377b8a7c1471a45eb7b4cc219ca4d69abd0eee}
     peerDependencies:
       '@nestjs/common': ^11.0.0
       '@nestjs/core': ^11.0.0
@@ -1498,6 +1501,9 @@ packages:
     resolution: {integrity: sha512-YZN0HxLpH0PPI0Eo/7cJHXda2aHn5wY6BeFKYL1b6J8CPmai1CfglJKuFpHHhTOHVFhTnlnGy9wGt4hmFvtYTA==, tarball: https://npm.pkg.github.com/download/@leejinyoung-kr/core-storage/0.3.0/9a946a30e49d36b393469675748601371e3cfe87}
     peerDependencies:
       '@nestjs/common': ^11.0.0
+
+  '@leejinyoung-kr/core-time@0.1.0':
+    resolution: {integrity: sha512-w5/g5JlDbVK0RZpK4Mk4n8ZNr3h37NwjMSSR3DjFvzb2m8mdDNN9NxDc8OTVO0yj4y9D0DeuAysSMxmlsMy4Hw==, tarball: https://npm.pkg.github.com/download/@leejinyoung-kr/core-time/0.1.0/f81e841f598f9284dde6ecf2884de2b878cfd9e4}
 
   '@lukeed/csprng@1.1.0':
     resolution: {integrity: sha512-Z7C/xXCiGWsg0KuKsHTKJxbWhpI3Vs5GwLfOean7MGyVFGqdRgBbAjOCh6u4bbjPc/8MJ2pZmK/0DLdCbivLDA==}
@@ -8266,7 +8272,7 @@ snapshots:
       passport-jwt: 4.0.1
       passport-local: 1.0.0
 
-  '@leejinyoung-kr/core-common@0.3.0(@nestjs/common@11.1.24(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))':
+  '@leejinyoung-kr/core-common@0.4.0(@nestjs/common@11.1.24(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))':
     dependencies:
       '@nestjs/common': 11.1.24(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1)
       class-validator: 0.15.1
@@ -8280,7 +8286,7 @@ snapshots:
     dependencies:
       '@prisma/adapter-mariadb': 7.10.0
 
-  '@leejinyoung-kr/core-jobs@0.2.0(@nestjs/common@11.1.24(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/core@11.1.24)':
+  '@leejinyoung-kr/core-jobs@0.3.0(@nestjs/common@11.1.24(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/core@11.1.24)':
     dependencies:
       '@nestjs/common': 11.1.24(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1)
       '@nestjs/core': 11.1.24(@nestjs/common@11.1.24(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/platform-express@11.1.24)(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -8307,6 +8313,8 @@ snapshots:
       '@aws-sdk/client-s3': 3.1063.0
       '@aws-sdk/s3-request-presigner': 3.1063.0
       '@nestjs/common': 11.1.24(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1)
+
+  '@leejinyoung-kr/core-time@0.1.0': {}
 
   '@lukeed/csprng@1.1.0': {}
 

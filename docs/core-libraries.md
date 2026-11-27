@@ -12,7 +12,8 @@
 | core-storage | S3 호환(B2) 업로드 · 삭제 · presigned, MIME/매직바이트 검증 | [backend/src/file/](../backend/src/file/) |
 | core-config | 부팅 시 환경 변수 스키마 검증 — 틀린 키를 전부 모아 한 번에 보고 | [backend/src/config/env.ts](../backend/src/config/env.ts) |
 | core-db | Prisma MariaDB 어댑터 감싸기 `withKstDateTime` — DB 에는 KST 벽시계로 쓰고 읽을 때 시점으로 되돌린다 (2026-10-28, [구현 노트](implementation-notes.md)) | [prisma.service.ts](../backend/src/prisma/prisma.service.ts), `prisma/seed.ts` · `prisma/demo-reset.ts` |
-| core-common · core-logging | 전역 예외 필터 · 페이지네이션 · `/_meta`, 요청 ID · 접근 로그 | 컨트롤러 전반 |
+| core-common · core-logging | 전역 예외 필터 · 페이지네이션 · `/_meta` · `/health`(2026-11-27), 요청 ID · 접근 로그 | 컨트롤러 전반, [health/](../backend/src/health/) |
+| core-time | 한국 날짜(오늘 · 이번 달, +9시간 고정) · 날짜 더하기 (2026-11-27) | 서비스 · 예약 작업의 `kstToday()` · `kstMonth()` |
 
 아래 코드는 라이브러리에서 발췌해 줄였다(검증 · 로그 일부 생략).
 
@@ -75,7 +76,7 @@ prisma.$extends(encryptedFields({ credential: ['password_enc', 'totp_enc', 'back
 
 ## 2. 예약 작업 — core-jobs
 
-`@Job({ name, cron, leaseMs })` 을 붙이면 실행마다 기록을 남기고, 겹침 · 멈춤을 처리한다. 저장소는 앱이 구현한다 — 생활모아 는 `job_run` 테이블([job-run.store.ts](../backend/src/maintenance/job-run.store.ts)).
+`@Job({ name, cron, leaseMs })` 을 붙이면 실행마다 기록을 남기고, 겹침 · 멈춤을 처리한다. 저장소는 앱이 고른다 — 생활모아 는 `job_run` 테이블용 기본 저장소(`core-jobs/prisma`, 2026-11-27 부터)를 상속해 실패 시 시스템 로그만 붙인다([job-run.store.ts](../backend/src/maintenance/job-run.store.ts)).
 
 - **겹침 방지 두 겹**: 같은 프로세스 안은 메모리의 실행 자리로, 프로세스 사이는 저장소가 막는다(생활모아 는 `running_key` 유니크 — 충돌하면 건너뜀).
 - **lease**: 핸들러와 lease 타이머를 경주시켜 먼저 끝나는 쪽을 따른다. lease 가 먼저 끝나면 실패로 마감하고 핸들러에 중단 신호(`AbortSignal`)를 보낸다 — 멈춘 작업이 다음 실행을 막지 않는다.

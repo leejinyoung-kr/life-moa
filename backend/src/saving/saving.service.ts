@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { Prisma, Saving } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { todayKst } from '../common/kst-date';
+import { kstToday } from '@leejinyoung-kr/core-time';
 import { parsePage } from '@leejinyoung-kr/core-common';
 import { CreateSavingDto } from './dto/create-saving.dto';
 import { QuerySavingDto } from './dto/query-saving.dto';
@@ -84,7 +84,7 @@ export class SavingService {
       : 0;
 
     // 만기 임박: 오늘 ~ 30일 이내 만기. maturity_date 는 날짜 칸(UTC 자정)이라 지금 시각이 아니라 오늘(KST) 날짜와 비교한다
-    const today = todayKst();
+    const today = kstToday();
     const in30 = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
     const maturityNear = rows.filter(
       (r) =>

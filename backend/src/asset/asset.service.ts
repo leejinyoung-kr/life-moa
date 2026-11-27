@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma, TransactionType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { kstMonthStr } from '../common/kst-date';
+import { kstMonth } from '@leejinyoung-kr/core-time';
 
 type SummaryType = 'cash' | 'savings' | 'investment';
 
@@ -53,7 +53,7 @@ export class AssetService {
         where: { user_id: userId },
       }),
       this.prisma.netWorthSnapshot.findFirst({
-        where: { user_id: userId, month: { lt: kstMonthStr() } },
+        where: { user_id: userId, month: { lt: kstMonth() } },
         orderBy: { month: 'desc' },
       }),
     ]);
@@ -153,7 +153,7 @@ export class AssetService {
 
   // 순자산 추이 — 지난 5개월 월말 스냅샷 + 이번 달(지금 값, 요약 숫자와 같다), 월 오름차순
   async trend(userId: number) {
-    const month = kstMonthStr();
+    const month = kstMonth();
     const [snaps, live] = await Promise.all([
       this.prisma.netWorthSnapshot.findMany({
         where: { user_id: userId, month: { lt: month } },

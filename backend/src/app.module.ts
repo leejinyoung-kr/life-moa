@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
-import { JwtAuthGuard } from '@leejinyoung-kr/core-auth';
+import { JwtAuthGuard, Public } from '@leejinyoung-kr/core-auth';
 import { JobsModule } from '@leejinyoung-kr/core-jobs';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -27,14 +27,18 @@ import { AccessLogModule } from './access-log/access-log.module';
 import { ImportModule } from './import/import.module';
 import { PushModule } from './push/push.module';
 import { MailModule } from './mail/mail.module';
-import { HealthModule } from './health/health.module';
+import { DbHealthCheck } from './health/db-health.check';
 import { SystemLogModule } from './system-log/system-log.module';
 import { RecurringScheduleModule } from './recurring-schedule/recurring-schedule.module';
 import { TransactionFavoriteModule } from './transaction-favorite/transaction-favorite.module';
-import { AllExceptionsFilter, MetaModule } from '@leejinyoung-kr/core-common';
+import {
+  AllExceptionsFilter,
+  HealthModule,
+  MetaModule,
+} from '@leejinyoung-kr/core-common';
 import { cryptoOptions } from './crypto/crypto-options';
 import { CryptoAuditModule } from './crypto/crypto-audit.module';
-import { PrismaJobRunStore } from './maintenance/job-run.store';
+import { AppJobRunStore } from './maintenance/job-run.store';
 import { JobsMetaContributor } from './meta/jobs.meta';
 import { NotificationMetaContributor } from './meta/notification.meta';
 import { OutboxMetaContributor } from './meta/outbox.meta';
@@ -45,7 +49,7 @@ import { env } from './config/env';
     // 예약 작업(@Job, maintenance/) — 실행 기록은 job_run, 실패는 시스템 로그에도 남긴다.
     // lease 안에 끝나지 않거나 프로세스가 죽어 끝을 기록하지 못한 실행은 failed(lease_expired)로 마감된다
     JobsModule.forRoot({
-      store: PrismaJobRunStore,
+      store: AppJobRunStore,
       imports: [SystemLogModule],
       timeZone: 'Asia/Seoul',
     }),
@@ -87,7 +91,8 @@ import { env } from './config/env';
     ImportModule,
     PushModule,
     MailModule,
-    HealthModule,
+    // GET /health — 오케스트레이터 probe 가 토큰 없이 부른다. DB 가 끊기거나 3초 안에 답이 없으면 503
+    HealthModule.forRoot({ check: DbHealthCheck, decorators: [Public()] }),
     SystemLogModule,
     RecurringScheduleModule,
     TransactionFavoriteModule,

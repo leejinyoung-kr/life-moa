@@ -44,9 +44,9 @@
 | 인덱스 | 쓰는 쿼리 | 판정 |
 | --- | --- | --- |
 | `transaction_favorite_user_id_sort_order_idx` `(user_id, sort_order)` | 목록 `transaction-favorite/transaction-favorite.service.ts:34` → `user_id = ? ORDER BY sort_order, id` ／ 맨 뒤 순서 `:56` → `user_id = ? ORDER BY sort_order DESC LIMIT 1` | **필요** — 등호 + 정렬, 순서가 맞다 |
-| `saving_user_id_idx` `(user_id)` | 목록 `saving/saving.service.ts:52` · 자산 요약 `asset/asset.service.ts:48` · 만기 알림 `maintenance/notification-cron.service.ts:83`(`maturity_date IN (...)`) · D-day `dashboard/dashboard.service.ts:173` → 전부 `user_id = ? AND deleted_at IS NULL [AND maturity_date ...]` | **필요** (조회 + FK) |
+| `saving_user_id_idx` `(user_id)` | 목록 `saving/saving.service.ts:52` · 자산 요약 `asset/asset.service.ts:48` · 만기 알림 `maintenance/notification-cron.service.ts:76`(`maturity_date IN (...)`) · D-day `dashboard/dashboard.service.ts:173` → 전부 `user_id = ? AND deleted_at IS NULL [AND maturity_date ...]` | **필요** (조회 + FK) |
 | `recurring_schedule_user_id_idx` `(user_id)` | 목록 `recurring-schedule/recurring-schedule.service.ts:63` · 반복거래 `transaction/transaction.service.ts:185` · 현금흐름 예측 `dashboard/dashboard.service.ts:103` → `user_id = ? AND deleted_at IS NULL AND kind = ? [AND active = 1]` | **필요** (조회 + FK) |
-| `subscription_user_id_idx` `(user_id)` | 목록 `subscription/subscription.service.ts:80` · 대시보드 `dashboard/dashboard.service.ts:44`·`:96`·`:177` · 결제 알림 `maintenance/notification-cron.service.ts:110` · 캘린더 `calendar/calendar.service.ts:286` | **필요** (조회 + FK) |
+| `subscription_user_id_idx` `(user_id)` | 목록 `subscription/subscription.service.ts:80` · 대시보드 `dashboard/dashboard.service.ts:44`·`:96`·`:177` · 결제 알림 `maintenance/notification-cron.service.ts:103` · 캘린더 `calendar/calendar.service.ts:286` | **필요** (조회 + FK) |
 
 ### net_worth_snapshot
 
@@ -66,7 +66,7 @@
 | 인덱스 | 쓰는 쿼리 | 판정 |
 | --- | --- | --- |
 | `calendar_event_user_id_date_idx` `(user_id, date)` | 다가오는 일정 `dashboard/dashboard.service.ts:58` → `user_id = ? AND deleted_at IS NULL AND date >= ? ORDER BY date LIMIT 4` ／ 월 목록 `calendar/calendar.service.ts:361` → `user_id = ? AND deleted_at IS NULL AND (반복없음 AND date 범위 OR 반복 AND date < ? AND (recur_until IS NULL OR recur_until >= ?)) ORDER BY date, id` ／ 다가오는 일정(캘린더) `:405` | **필요** — 대시보드 쿼리에는 딱 맞다. 월 목록은 `OR` 라 `user_id` 까지만 좁힐 가능성 (데이터가 적어 문제는 아님) |
-| `notification_user_id_created_at_idx` `(user_id, created_at)` | 목록 `notification/notification.service.ts:96` → `user_id = ? [AND group = ?] ORDER BY occurred_at DESC LIMIT ?` — **정렬이 `created_at` 이 아니라 `occurred_at`** ／ 안 읽은 수 `:79` → `user_id = ? AND read_at IS NULL` · 전체 읽음 `:133` · 중복 알림 확인 `maintenance/notification-cron.service.ts:54` → `user_id = ? AND title = ? AND read_at IS NULL` | **일부 미사용** — `user_id` 만 쓰이고 `created_at` 으로 정렬·범위를 거는 쿼리가 없다. 목록은 filesort 예상(EXPLAIN ④). `(user_id, occurred_at)` 으로 바꾸는 후보 |
+| `notification_user_id_created_at_idx` `(user_id, created_at)` | 목록 `notification/notification.service.ts:96` → `user_id = ? [AND group = ?] ORDER BY occurred_at DESC LIMIT ?` — **정렬이 `created_at` 이 아니라 `occurred_at`** ／ 안 읽은 수 `:79` → `user_id = ? AND read_at IS NULL` · 전체 읽음 `:133` · 중복 알림 확인 `maintenance/notification-cron.service.ts:47` → `user_id = ? AND title = ? AND read_at IS NULL` | **일부 미사용** — `user_id` 만 쓰이고 `created_at` 으로 정렬·범위를 거는 쿼리가 없다. 목록은 filesort 예상(EXPLAIN ④). `(user_id, occurred_at)` 으로 바꾸는 후보 |
 | `holiday_date_name_key` UNIQUE `(date, name)` | 공휴일 캐싱 `holiday/holiday.service.ts:62` → `createMany(skipDuplicates)` = `INSERT IGNORE` — 같은 날·같은 이름 중복 저장을 이 UNIQUE 가 막는다 | **필요** (중복 방지 규칙 자체) |
 | `holiday_year_idx` `(year)` | 연도별 조회 `holiday/holiday.service.ts:44` → `year = ?` | **필요** |
 | `category_domain_code_key` UNIQUE `(domain, code)` | 추가 전 중복 확인 `category/category.service.ts:263` · 시드 `:325` → `domain = ? AND code = ?` | **필요** |
@@ -79,7 +79,7 @@
 | --- | --- | --- |
 | `user_google_id_key` UNIQUE `(google_id)` | 구글 로그인 `auth/auth.service.ts:202` → `upsert where google_id` | **필요** (한 구글 계정 = 한 사용자) |
 | `user_email_key` UNIQUE `(email)` | 이메일 코드 로그인 `auth/auth.service.ts:349` · 데모 `:176` · 개발 `:189` → `upsert where email` | **필요** |
-| `user_settings_user_id_key` UNIQUE `(user_id)` | `settings/settings.service.ts:14` · `security/vault.service.ts:50` · `maintenance/notification-cron.service.ts:75` 등 → `findUnique where user_id` (1:1) | **필요** |
+| `user_settings_user_id_key` UNIQUE `(user_id)` | `settings/settings.service.ts:14` · `security/vault.service.ts:50` · `maintenance/notification-cron.service.ts:68` 등 → `findUnique where user_id` (1:1) | **필요** |
 | `login_session_user_id_idx` `(user_id)` | 로그인 기록 `auth/auth.service.ts:365`·`:368`·`:373` → `user_id = ? AND revoked_at IS NULL [AND device = ? AND location = ?]` ／ 세션 목록 `security/security.service.ts:28` → `... ORDER BY is_current DESC, last_active_at DESC` | **필요** (조회 + FK) |
 | `refresh_token_jti_key` UNIQUE `(jti)` | 토큰 갱신 `auth/auth.service.ts:438` · 로그아웃 `:616`·`:620` · 푸시 세션 확인 `push/push.service.ts:42` → `jti = ?` | **필요** (화이트리스트 키) |
 | `refresh_token_user_id_idx` `(user_id)` | 앱 코드에 `refresh_token.user_id` 로 거는 쿼리 없음. `user` 삭제(`auth/auth.service.ts:648`) 때 FK `ON DELETE CASCADE` 가 쓴다 | **앱 쿼리 없음 (FK 전용)** — 지워도 MariaDB 가 FK 인덱스를 다시 만든다 |
@@ -94,7 +94,7 @@
 
 | 인덱스 | 쓰는 쿼리 | 판정 |
 | --- | --- | --- |
-| `credential_user_id_idx` `(user_id)` | 목록 `credential/credential.service.ts:90` → `user_id = ? AND deleted_at IS NULL ORDER BY updated_at DESC` · 2FA 없는 수 `:98` · 비번 회전 알림 `maintenance/notification-cron.service.ts:161` · 검색 `search/search.service.ts:29` | **필요** (조회 + FK). 목록 정렬 `updated_at` 은 인덱스 밖(filesort) — 계정 수가 적어 문제는 아님 |
+| `credential_user_id_idx` `(user_id)` | 목록 `credential/credential.service.ts:90` → `user_id = ? AND deleted_at IS NULL ORDER BY updated_at DESC` · 2FA 없는 수 `:98` · 비번 회전 알림 `maintenance/notification-cron.service.ts:154` · 검색 `search/search.service.ts:29` | **필요** (조회 + FK). 목록 정렬 `updated_at` 은 인덱스 밖(filesort) — 계정 수가 적어 문제는 아님 |
 | `storage_folder_user_id_idx` `(user_id)` | 폴더 전체 `file/file.service.ts:121`·`:183`·`:594` → `user_id = ? AND deleted_at IS NULL` | **필요** (조회 + FK) |
 | `storage_folder_parent_id_idx` `(parent_id)` | 폴더 목록 `file/file.service.ts:62` · 하위 폴더 BFS `:685` · 폴더째 업로드 `:543` → `user_id = ? AND parent_id = ? AND deleted_at IS NULL` · 하위 폴더 수 `_count`(`:69`) · FK `SET NULL` | **필요** |
 | `storage_file_user_id_idx` `(user_id)` | 사용량 `file/file.service.ts:86`·`:310` → `user_id = ? AND deleted_at IS NULL` 의 `SUM(size)` 등 — 아래 `(user_id, hash)` 의 왼쪽 접두사로도 탄다. FK 도 그쪽이 만족 | **중복 후보** |
@@ -105,9 +105,9 @@
 
 | 인덱스 | 쓰는 쿼리 | 판정 |
 | --- | --- | --- |
-| `job_run_running_key_key` UNIQUE `(running_key)` | 작업 시작 `maintenance/job-run.store.ts:27` → `INSERT` 가 같은 작업 이름으로 충돌하면(P2002) "이미 실행 중" | **필요** — 동시 실행 방지 규칙 자체가 이 UNIQUE 다 |
+| `job_run_running_key_key` UNIQUE `(running_key)` | 작업 시작 core-jobs/prisma `PrismaJobRunStore.start`(`maintenance/job-run.store.ts` 가 상속) → `INSERT` 가 같은 작업 이름으로 충돌하면(P2002) "이미 실행 중" | **필요** — 동시 실행 방지 규칙 자체가 이 UNIQUE 다 |
 | `job_run_job_started_at_idx` `(job, started_at)` | `/_meta` 작업 상태 `meta/jobs.meta.ts:46`·`:51` → `job = ? [AND status = 'succeeded'] ORDER BY id DESC LIMIT 1` — **정렬이 `started_at` 이 아니라 `id`** ／ 90일 정리 `maintenance/trash-cron.service.ts:51` → `started_at < ? AND status <> 'running'` — `job` 조건이 없어 이 인덱스를 못 탄다 | **일부 미사용** — `job` 만 쓰인다. `(job, started_at, id)` 순서라 `ORDER BY id` 는 정렬이 따로 돈다(90일치라 작음). 코드 주석(`jobs.meta.ts:43`)은 "(job, started_at) 인덱스가 있다" 고 적혀 있다 |
-| `job_run_status_lease_until_idx` `(status, lease_until)` | lease 만료 찾기 `maintenance/job-run.store.ts:72` → `status = 'running' AND lease_until < ?` | **필요** — 등호 + 범위, 순서가 맞다 |
+| `job_run_status_lease_until_idx` `(status, lease_until)` | lease 만료 찾기 core-jobs/prisma `PrismaJobRunStore.findExpired` → `status = 'running' AND lease_until < ?` | **필요** — 등호 + 범위, 순서가 맞다 |
 | `outbox_message_idempotency_key_key` UNIQUE `(idempotency_key)` | 적재 `push/outbox.store.ts:28` → 같은 `noti:<알림 id>` 면 충돌(P2002) → 중복 발송 방지 | **필요** (멱등성 규칙 자체) |
 | `outbox_message_status_available_at_idx` `(status, available_at)` | 선점 후보 `push/outbox.store.ts:56` → `status = 'pending' AND available_at <= ? ORDER BY available_at LIMIT ?` ／ `/_meta` 가장 오래 밀린 대기 `meta/outbox.meta.ts:28` · 상태별 수 `:24` · 선점 만료 `push/outbox.store.ts:128`·`meta/outbox.meta.ts:44` → `status = 'sending' AND claimed_until < ?`(앞 컬럼만) | **필요** — 디스패처 쿼리에 딱 맞다 |
 | `system_log_user_id_idx` `(user_id)` | 로그 조회 `system-log/system-log.service.ts:90` → `(user_id = ? OR user_id IS NULL) [AND level = ?] [AND category = ?] [AND created_at BETWEEN ? AND ?] ORDER BY created_at DESC LIMIT ?` — `ref_or_null` 로 탈 수 있다 | **필요** |

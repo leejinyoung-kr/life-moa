@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { AssetService } from '../asset/asset.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { todayKst } from '../common/kst-date';
+import { kstToday } from '@leejinyoung-kr/core-time';
 import { ExchangeRateService } from '../exchange-rate/exchange-rate.service';
 
 // 주기별 금액을 월 단위로 환산 (yearly/12, weekly*52/12, daily는 평일만(연 261일)*261/12, monthly 그대로)
@@ -22,7 +22,7 @@ export class DashboardService {
 
   // 대시보드 요약 — 이번 달 수입/지출·순자산·활성구독 + 최근거래·다가오는일정
   async summary(userId: number) {
-    const today = todayKst();
+    const today = kstToday();
     const y = today.getUTCFullYear();
     const m = today.getUTCMonth();
     const monthStart = new Date(Date.UTC(y, m, 1));
@@ -164,7 +164,7 @@ export class DashboardService {
 
   // 통합 D-day 보드 — 예적금 만기·구독 결제·할일 마감을 한 목록으로 집계(임박순)
   async deadlines(userId: number, withinDays = 90) {
-    const today = todayKst();
+    const today = kstToday();
     const until = new Date(today);
     until.setUTCDate(until.getUTCDate() + withinDays);
     const range = { gte: today, lte: until };

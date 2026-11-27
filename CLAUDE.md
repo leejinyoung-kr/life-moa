@@ -53,7 +53,7 @@ life-moa/
 │       ├── health/        # GET /health (DB 핑, 토큰 없이)
 │       ├── crypto/        # 암호문 컬럼 목록·문맥(AAD)·키 설정, 부팅 시 재암호화, 배포 전 점검(crypto-check)
 │       ├── config/        # 환경변수 검증(env.ts)·배포 전 점검(check-env)·외부 연결 대기 시간
-│       ├── common/        # 데모 판별(demo.ts)·KST 날짜(kst-date.ts)·vault 유틸 — CryptoService 는 core-security, ClientInfo 는 core-logging
+│       ├── common/        # 데모 판별(demo.ts)·vault 유틸 — KST 날짜는 core-time — CryptoService 는 core-security, ClientInfo 는 core-logging
 │       └── prisma/        # PrismaService / PrismaModule (어댑터는 core-db withKstDateTime 으로 감싼다)
 ├── nginx/             # 앞단 Nginx 설정 default.conf (홈서버 · 데모, ADR 0010)
 ├── tailscale/         # 사이드카 serve.json (전부 nginx:80 으로)

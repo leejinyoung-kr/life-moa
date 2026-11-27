@@ -1,12 +1,12 @@
 import { addCycle, pastBillingDates, rollForward } from './billing-date.util';
-import { todayKst } from '../common/kst-date';
+import { kstToday } from '@leejinyoung-kr/core-time';
 
 const d = (s: string) => new Date(`${s}T00:00:00Z`);
 
 describe('billing-date.util', () => {
-  it('todayKst 는 UTC 로 전날이어도 한국 날짜를 돌려준다', () => {
+  it('kstToday 는 UTC 로 전날이어도 한국 날짜를 돌려준다', () => {
     // 2026-10-05 06:30 KST = 2026-10-04 21:30 UTC
-    expect(todayKst(new Date('2026-10-04T21:30:00Z'))).toEqual(d('2026-10-05'));
+    expect(kstToday(new Date('2026-10-04T21:30:00Z'))).toEqual(d('2026-10-05'));
   });
 
   it('월 주기는 말일을 넘기면 그 달 말일로 맞춘다', () => {

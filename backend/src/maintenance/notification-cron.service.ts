@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { Job } from '@leejinyoung-kr/core-jobs';
+import { addDays, kstToday } from '@leejinyoung-kr/core-time';
 import { NotiGroup, NotiTone } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { todayKst } from '../common/kst-date';
 import { NotificationService } from '../notification/notification.service';
 import { CalendarService } from '../calendar/calendar.service';
 
@@ -13,13 +13,6 @@ const CAL_TYPE_LABEL: Record<string, string> = {
   exp: '서류 만료',
   task: '할일',
 };
-
-// 오늘(KST 날짜의 UTC 자정) + days 후 Date
-function addDays(base: Date, days: number): Date {
-  const d = new Date(base);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d;
-}
 
 @Injectable()
 export class NotificationCronService {
@@ -69,7 +62,7 @@ export class NotificationCronService {
 
   // 한 사용자의 알림 후보를 생성 (예적금만기·구독결제/체험·캘린더 일정·비번회전)
   private async runForUser(userId: number): Promise<number> {
-    const today = todayKst();
+    const today = kstToday();
     let n = 0;
 
     const settings = await this.prisma.userSettings.findUnique({
@@ -168,7 +161,7 @@ export class NotificationCronService {
       });
       for (const c of stale) {
         // 바꾼 날은 한국 날짜로 센다 (UTC 날짜로 세면 KST 0~9시에 바꾼 것이 하루 더 지난 것으로 셈)
-        const changedDay = todayKst(c.password_changed_at!);
+        const changedDay = kstToday(c.password_changed_at!);
         const daysStale = Math.round(
           (today.getTime() - changedDay.getTime()) / MS_PER_DAY,
         );
