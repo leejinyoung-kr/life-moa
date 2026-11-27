@@ -1,17 +1,22 @@
-# 생활모아
+# 생활모아 (life-moa)
 
-돈 · 계정 · 파일 · 일정을 한곳에 두는 1인용 생활 장부. 홈서버에서 직접 운영하며 매일 쓰는 앱이다. (2026-11-17 LifeLedger(`life-ledger`)에서 이름을 바꿨다)
+생활(life) + 모아 — 생활에 쓰는 것을 한곳에 모은다는 뜻. 「모아」가 하는 일, life 가 모으는 대상이고, 화면 이름은 life 를 「생활」로 옮겨 순한글로 지었다.
+
+돈 · 계정 · 파일 · 일정을 한곳에 두는 1인용 생활 장부.
 
 **데모: <https://lifemoa-demo.tailba78c1.ts.net>** — 로그인 화면의 "데모로 둘러보기"를 누르면 샘플 데이터가 든 계정으로 들어간다. 계정 보관함 잠금 비밀번호는 `demo1234` 이고, 데이터는 매일 새벽 4시(KST)에 처음 상태로 돌아간다.
 
+## 기능
+
 | 영역 | 하는 일 |
 | --- | --- |
-| 가계부 | 수입 · 지출 · 예적금 (투자는 2026-11 따로 만든 투자 앱으로 옮기고 순자산에는 그 합계 한 줄만 받는다) |
-| 구독 · 자산 종합 | 구독 결제일 관리, 월별 순자산 추이 |
+| 가계부 | 수입 · 지출 · 예적금, 자동이체 · 반복거래, 자주 쓰는 거래 즐겨찾기 |
+| 구독 · 자산 종합 | 구독 결제일 관리, 월별 순자산 추이, 현금흐름 예측 |
 | 계정 보관함 | 사이트 계정 · 비밀번호 · TOTP · 백업 코드를 암호화해 보관, 열람할 때마다 기록 |
-| 파일 보관함 | 서류 파일 (Backblaze B2) |
-| 캘린더 | 직접 넣은 일정 + 구독 결제일 · 예적금 만기 · 공휴일 |
+| 파일 보관함 | 서류 파일 (Backblaze B2) — 폴더 · 전체 검색 · ZIP 다운로드 |
+| 캘린더 | 직접 넣은 일정(양력 · 음력) + 구독 결제일 · 예적금 만기 · 공휴일 |
 | 보안 · 알림 | 로그인 기기 · 세션 관리, 마스터 잠금, 결제 · 만기 알림(웹 푸시) |
+| 검색 · 내보내기 | 거래 · 계정 통합 검색, 데이터 내보내기(JSON · ZIP) · 계정 JSON 가져오기 |
 
 ## 화면
 
@@ -19,7 +24,18 @@
 
 | 계정 보관함 | 캘린더 | 휴대폰 (PWA) |
 | --- | --- | --- |
-| ![계정 보관함 — 잠금 상태, 2FA 미설정 경고](docs/screenshots/credentials.png) | ![캘린더 — 구독 결제 · 적금 만기 · 공휴일 연동](docs/screenshots/calendar.png) | ![휴대폰 대시보드 — 아래 탭 메뉴](docs/screenshots/mobile.png) |
+| ![계정 보관함 — 잠금 상태, 2FA 미설정 경고](docs/screenshots/credentials.png) | ![캘린더 — 직접 넣은 일정과 구독 결제일](docs/screenshots/calendar.png) | ![휴대폰 대시보드 — 아래 탭 메뉴](docs/screenshots/mobile.png) |
+
+2026-11-27 로컬에서 샘플 데이터로 찍었다.
+
+## 지금 상태
+
+홈서버에서 직접 운영하며 매일 쓴다. `main` 에 push 하면 검사 뒤 홈서버에 자동 배포된다 (순서는 아래 「로컬 실행」 끝). 데모는 같은 코드를 따로 띄운 인스턴스라 배포 때 같이 갱신된다.
+
+## 다른 앱과의 관계
+
+- **투자는 주식모아**(따로 만든 투자 현황 앱, 비공개)가 맡는다. 순자산의 「투자」 는 주식모아 합계 한 줄을 매일 받아 온다 ([ADR 0011](docs/adr/0011-move-investments-to-stock-moa.md)).
+- **거의 안 보는 비밀은 비밀보관함**(PC 로컬 금고 프로그램, 비공개)에 둔다 — `.env` · 복구 코드 · 비밀 파일. 이 앱의 계정 보관함에는 자주 보는 계정만 둔다.
 
 ## 구조
 
@@ -97,41 +113,19 @@ DB 백업 · 알림 · 반복거래 등 예약 작업 8개를 실행마다 `job_
 "전체 로그아웃" 뒤 기기 두 대만 다시 로그인했는데 푸시는 여섯 곳으로 나갔다. 푸시 구독이 사용자에만 묶여 있어서 로그아웃 · 세션 종료와 상관없이 남아 있었다.
 구독을 로그인 세션에 FK(`ON DELETE CASCADE`)로 묶고, 로그아웃 · 세션 종료 때 그 세션의 구독을 같이 지운다. 앱을 열 때 지금 기기의 구독을 다시 등록해 빠진 기기가 없게 했다.
 
-## AI가 한 것 / 내가 한 것
-
-이 앱은 AI(Claude)와 대화하며 만들었다. 설계와 구현은 AI 가 제안한 대로 진행했고, **당시에는 코드 리뷰 · 대안 검토 · 검증을 따로 하지 않았다.** 2026-10 부터 결정마다 대안을 사후에 비교하는 [소급 ADR](docs/adr/README.md) 을 쓰며 검토하고 있다. 2026-10-20 [ADR 0009](docs/adr/0009-code-management-values-stored-as-code.md) 부터는 결정할 때 AI 가 대안을 먼저 보여 주고 내가 고른다.
-
-| 영역 | AI (Claude) | 나 |
-| --- | --- | --- |
-| 기획 · 설계 | 기획서 · 구조 · DB 설계 · 기술 선택 대부분 | 무엇을 만들지, 어떤 기능이 필요한지 정했다 |
-| 코드 · 테스트 | 프론트 · 백엔드 · 공통 라이브러리 코드와 테스트 대부분 | — |
-| 문서 | docs · README · 커밋 메시지 대부분 | — |
-| 배포 · 운영 | Dockerfile · compose · 배포 워크플로 · 운영 절차 문서 | 홈서버 장비, sudo 가 필요한 작업과 설치 명령 실행, Google Cloud 콘솔 같은 외부 설정, `main` 배포 시점 |
-| 공개 | 공개 준비 계획 · 이력 비밀값 검사 · 데모 인스턴스 구성 | 이름 변경(doc-nexus → life-ledger)과 public 공개, 공통 라이브러리 young-core 는 비공개로 두기로 정했다 |
-| 확인 · 사용 | 고친 뒤 로컬 화면을 브라우저 도구로 확인 (처음부터, 2026-08-08 dev-login 이 생긴 뒤로는 로그인이 필요한 화면도) | 고친 뒤 로컬에서 직접 보고 배포 (처음부터), 매일 쓰는 실사용 |
-
-- 커밋 399개(2026-10-17 기준) 중 243개에 AI 공동 작성 표시(`Co-Authored-By: Claude`)가 있다. 표시가 없는 커밋을 누가 썼는지는 따로 가르지 않았다.
-- AI 가 만든 코드가 실제로 틀려 나중에 고친 흔적도 커밋에 남아 있다 — 예: refresh 쿠키 `SameSite` (`487811a`, AI 가 찾음), 순자산 이중 계산 (`b543eb8`, AI 가 찾음), 로그아웃한 기기로 가던 푸시 (`ed475ce`, 위 「해결한 문제 5」 — 내가 쓰다가 발견). 무엇이 왜 틀렸는지는 ADR 과 함께 정리하고 있다.
-- 배포 때 DB 마이그레이션 자동 적용 (2026-06 ~ 08, [ADR 0004](docs/adr/0004-auto-migrate-on-deploy.md)): 처음에는 자동 적용이 위험해 보여 내가 뺐고(06-27), 홈서버에서 매번 손으로 적용하기 번거로워 내가 다시 자동으로 되돌렸다(08-01).
-- DB 하나를 여러 앱이 같이 쓰기 (2026-07-18, [ADR 0006](docs/adr/0006-shared-mariadb-per-app-user.md)): 프로젝트마다 DB 컨테이너를 띄우는 것보다 MariaDB 하나에 데이터베이스 이름만 달리해 관리하는 편이 낫다고 보고 내가 정했다.
-- 공개 준비 기능 정리 (2026-10-13, [계획서](docs/archive/2026-10-13-public-release-plan.md) 「정해진 것」): 쓰는 기능 · 안 쓰는 기능 목록은 내가 뽑았고, AI 가 화면 정리안으로 정리했다.
-- 디자인 겉모양 되돌림 (2026-10-14, `932301b`): 개편한 시안이 너무 AI 스러워서 내가 개편 전(초록 · 흰 카드) 쪽으로 되돌리기로 했다. 되돌린 겉모양 구현은 AI.
-- 코드 관리 값을 이름 대신 코드로 저장 (2026-10-20, [ADR 0009](docs/adr/0009-code-management-values-stored-as-code.md)): 대안 · 추천 · 운영 데이터 확인은 AI, 고른 것은 나(둘 다 AI 추천안).
-- DB 시각을 실제 값 KST 로 바꾼 것 (2026-10-28, infra ADR 0008 · [구현 노트](docs/implementation-notes.md)): HeidiSQL 로 운영 DB 시각이 9시간 이른 것을 내가 발견했다. AI 는 UTC 유지(안 1)를 추천했고, 내가 실제 값 KST(안 3)를 골랐다. 진행 순서 · 감싸기 위치 · 전환 방법 · 전환 시간은 AI 가 대안과 추천을 보여 주고 내가 추천대로 골랐다. 구현은 AI.
-- 사이드카 뒤에 Nginx 를 둔 것 (2026-11-02, [ADR 0010](docs/adr/0010-nginx-behind-tailscale-sidecar.md)): Nginx 를 써 보려는 것이 계기(나). 대안 비교 · 설정 · 로컬 시험 · 배포 워크플로는 AI, 이 앱에만 넣기 · 데모 포함 · 범위(로그인 횟수 제한 · gzip)는 대안 중 내가 골랐다. 그 전제로 운영 `TRUST_PROXY` 가 비어 있던 것을 AI 가 실측해 바로잡았다(공개 접속 확인은 내 휴대폰으로).
-- ADR 「다시 정한다면」 칸 (2026-11-02): 내 요청으로 AI 가 기록을 보고 초안을 썼다(0003 은 내가 쓴 칸). 각 칸에 "AI 초안" 표시가 있고, 내 판단이 아니라 읽고 고칠 초안이다.
-
 ## 문서
 
-- [docs/adr/](docs/adr/README.md) — 설계 결정 기록 (소급 · 사후 검토)
-- [docs/postmortems/](docs/postmortems/2026-10-16-homeserver-disk-build-cache.md) — 운영 사고 회고 (홈서버 디스크 84%)
-- [docs/runbooks/](docs/runbooks/) — 운영 절차 (데모 · Nginx · 사이드카 장애 · 재배포 · 되돌리기 · 키 교체)
-- [docs/implementation-notes.md](docs/implementation-notes.md) — 설명할 거리가 있는 개선 (문제 · 원인 · 고친 방법)
-- [docs/index-design.md](docs/index-design.md) · [docs/test-audit.md](docs/test-audit.md) — 인덱스 설계 근거 · 테스트 점검 (사후 검토 초안)
-- [docs/architecture.md](docs/architecture.md) — 모듈 · 예약 작업 · 화면 목록 · C4 다이어그램
-- [docs/core-libraries.md](docs/core-libraries.md) — 공통 라이브러리(비공개) 설계 · 핵심 코드 요약
-- [docs/api.md](docs/api.md) · [docs/erd.md](docs/erd.md) — API · DB
-- [docs/planning.md](docs/planning.md) — 화면 기획 (디자인 개편), 시안은 [docs/design/](docs/design/)
+| 문서 | 내용 |
+| --- | --- |
+| [docs/planning.md](docs/planning.md) | 화면 기획 (디자인 개편), 시안은 [docs/design/](docs/design/) |
+| [docs/architecture.md](docs/architecture.md) | 모듈 · 예약 작업 · 화면 목록 · C4 다이어그램 |
+| [docs/api.md](docs/api.md) · [docs/erd.md](docs/erd.md) | API · DB |
+| [docs/core-libraries.md](docs/core-libraries.md) | 공통 라이브러리(비공개) 설계 · 핵심 코드 요약 |
+| [docs/adr/](docs/adr/README.md) | 설계 결정 기록 (소급 · 사후 검토) |
+| [docs/runbooks/](docs/runbooks/) | 운영 절차 (데모 · Nginx · 사이드카 장애 · 재배포 · 되돌리기 · 키 교체) |
+| [docs/postmortems/](docs/postmortems/2026-10-16-homeserver-disk-build-cache.md) | 운영 사고 회고 (홈서버 디스크 84%) |
+| [docs/implementation-notes.md](docs/implementation-notes.md) | 설명할 거리가 있는 개선 (문제 · 원인 · 고친 방법) |
+| [docs/index-design.md](docs/index-design.md) · [docs/test-audit.md](docs/test-audit.md) | 인덱스 설계 근거 · 테스트 점검 (사후 검토 초안) |
 
 ## 로컬 실행
 
@@ -159,3 +153,31 @@ pnpm run dev
 | Swagger | <http://localhost:8000/api-docs> |
 
 배포(홈서버)는 `main` push 때 [deploy-home-server.yml](.github/workflows/deploy-home-server.yml) 이 GitHub 검사([ci.yml](.github/workflows/ci.yml) — lint · 타입 · build · test) → 홈서버에서 이미지 빌드 → 환경 변수 검사 → 마이그레이션 → 전체 복호화 점검 → Nginx 설정 검사 → 컨테이너 교체(Nginx · 사이드카 설정이 바뀌었으면 다시 만들기) → backend · Nginx healthy 대기 → 데모 갱신 순서로 한다. 운영 절차는 [docs/runbooks/](docs/runbooks/).
+
+## AI가 한 것 / 내가 한 것
+
+이 앱은 AI(Claude)와 대화하며 만들었다. 설계와 구현은 AI 가 제안한 대로 진행했고, **당시에는 코드 리뷰 · 대안 검토 · 검증을 따로 하지 않았다.** 2026-10 부터 결정마다 대안을 사후에 비교하는 [소급 ADR](docs/adr/README.md) 을 쓰며 검토하고 있다. 2026-10-20 [ADR 0009](docs/adr/0009-code-management-values-stored-as-code.md) 부터는 결정할 때 AI 가 대안을 먼저 보여 주고 내가 고른다.
+
+| 영역 | AI (Claude) | 나 |
+| --- | --- | --- |
+| 기획 · 설계 | 기획서 · 구조 · DB 설계 · 기술 선택 대부분 | 무엇을 만들지, 어떤 기능이 필요한지 정했다 |
+| 코드 · 테스트 | 프론트 · 백엔드 · 공통 라이브러리 코드와 테스트 대부분 | — |
+| 문서 | docs · README · 커밋 메시지 대부분 | — |
+| 배포 · 운영 | Dockerfile · compose · 배포 워크플로 · 운영 절차 문서 | 홈서버 장비, sudo 가 필요한 작업과 설치 명령 실행, Google Cloud 콘솔 같은 외부 설정, `main` 배포 시점 |
+| 공개 | 공개 준비 계획 · 이력 비밀값 검사 · 데모 인스턴스 구성 | 이름 변경(doc-nexus → life-ledger)과 public 공개, 공통 라이브러리 young-core 는 비공개로 두기로 정했다 |
+| 확인 · 사용 | 고친 뒤 로컬 화면을 브라우저 도구로 확인 (처음부터, 2026-08-08 dev-login 이 생긴 뒤로는 로그인이 필요한 화면도) | 고친 뒤 로컬에서 직접 보고 배포 (처음부터), 매일 쓰는 실사용 |
+
+- 커밋 399개(2026-10-17 기준) 중 243개에 AI 공동 작성 표시(`Co-Authored-By: Claude`)가 있다. 표시가 없는 커밋을 누가 썼는지는 따로 가르지 않았다.
+- AI 가 만든 코드가 실제로 틀려 나중에 고친 흔적도 커밋에 남아 있다 — 예: refresh 쿠키 `SameSite` (`487811a`, AI 가 찾음), 순자산 이중 계산 (`b543eb8`, AI 가 찾음), 로그아웃한 기기로 가던 푸시 (`ed475ce`, 위 「해결한 문제 5」 — 내가 쓰다가 발견). 무엇이 왜 틀렸는지는 ADR 과 함께 정리하고 있다.
+- 배포 때 DB 마이그레이션 자동 적용 (2026-06 ~ 08, [ADR 0004](docs/adr/0004-auto-migrate-on-deploy.md)): 처음에는 자동 적용이 위험해 보여 내가 뺐고(06-27), 홈서버에서 매번 손으로 적용하기 번거로워 내가 다시 자동으로 되돌렸다(08-01).
+- DB 하나를 여러 앱이 같이 쓰기 (2026-07-18, [ADR 0006](docs/adr/0006-shared-mariadb-per-app-user.md)): 프로젝트마다 DB 컨테이너를 띄우는 것보다 MariaDB 하나에 데이터베이스 이름만 달리해 관리하는 편이 낫다고 보고 내가 정했다.
+- 공개 준비 기능 정리 (2026-10-13, [계획서](docs/archive/2026-10-13-public-release-plan.md) 「정해진 것」): 쓰는 기능 · 안 쓰는 기능 목록은 내가 뽑았고, AI 가 화면 정리안으로 정리했다.
+- 디자인 겉모양 되돌림 (2026-10-14, `932301b`): 개편한 시안이 너무 AI 스러워서 내가 개편 전(초록 · 흰 카드) 쪽으로 되돌리기로 했다. 되돌린 겉모양 구현은 AI.
+- 코드 관리 값을 이름 대신 코드로 저장 (2026-10-20, [ADR 0009](docs/adr/0009-code-management-values-stored-as-code.md)): 대안 · 추천 · 운영 데이터 확인은 AI, 고른 것은 나(둘 다 AI 추천안).
+- DB 시각을 실제 값 KST 로 바꾼 것 (2026-10-28, infra ADR 0008 · [구현 노트](docs/implementation-notes.md)): HeidiSQL 로 운영 DB 시각이 9시간 이른 것을 내가 발견했다. AI 는 UTC 유지(안 1)를 추천했고, 내가 실제 값 KST(안 3)를 골랐다. 진행 순서 · 감싸기 위치 · 전환 방법 · 전환 시간은 AI 가 대안과 추천을 보여 주고 내가 추천대로 골랐다. 구현은 AI.
+- 사이드카 뒤에 Nginx 를 둔 것 (2026-11-02, [ADR 0010](docs/adr/0010-nginx-behind-tailscale-sidecar.md)): Nginx 를 써 보려는 것이 계기(나). 대안 비교 · 설정 · 로컬 시험 · 배포 워크플로는 AI, 이 앱에만 넣기 · 데모 포함 · 범위(로그인 횟수 제한 · gzip)는 대안 중 내가 골랐다. 그 전제로 운영 `TRUST_PROXY` 가 비어 있던 것을 AI 가 실측해 바로잡았다(공개 접속 확인은 내 휴대폰으로).
+- ADR 「다시 정한다면」 칸 (2026-11-02): 내 요청으로 AI 가 기록을 보고 초안을 썼다(0003 은 내가 쓴 칸). 각 칸에 "AI 초안" 표시가 있고, 내 판단이 아니라 읽고 고칠 초안이다.
+
+## 이름 바꾼 기록
+
+doc-nexus → life-ledger(LifeLedger, 2026-10-15) → `life-moa`(생활모아, 2026-11-17). 옛 주소는 GitHub 가 새 주소로 연결한다.
